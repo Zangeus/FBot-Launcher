@@ -99,7 +99,7 @@ public class Monitoring {
         String imagePath = "bot_sources/SU.png";
         TelegramBotSender.sendLocalPhoto(imagePath);
 
-        TelegramBotSender.sendNoteMessage("Легендарный квест 1001-ночи был завершен");
+        TelegramBotSender.sendNoteMessage("Исследование Виртуальной вселенной завершено");
     }
 
 

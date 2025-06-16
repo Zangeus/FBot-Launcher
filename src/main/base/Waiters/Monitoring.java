@@ -58,7 +58,10 @@ public class Monitoring {
                 continue;
             }
 
-            if (check("su_button.png") && check("elites_farm.png")) {
+            if (check("zero.png") &&
+                check("su_button.png") &&
+                check("elites_farm.png")) {
+
                 check(("overview.png"));
                 if (picToSend) sendPhoto();
 

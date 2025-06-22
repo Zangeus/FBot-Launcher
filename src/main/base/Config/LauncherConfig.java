@@ -25,17 +25,9 @@ public class LauncherConfig {
     private boolean notificationsEnabled = true;
     private boolean reportWithScreenshot = false;
     private int sleepDurationMinutes = 12;
+    //Виртуалка на 14к
     private boolean mondayCheckEnabled = true;
     private boolean monitoringEnabled = true;
-    private boolean takeTheMailEnabled = true;
-
-    public boolean isTakeTheMailEnabled() {
-        return takeTheMailEnabled;
-    }
-
-    public void setTakeTheMailEnabled(boolean takeTheMailEnabled) {
-        this.takeTheMailEnabled = takeTheMailEnabled;
-    }
 
     public boolean isMonitoringEnabled() {
         return monitoringEnabled;
@@ -207,7 +199,6 @@ public class LauncherConfig {
                 ", sleepDurationMinutes=" + sleepDurationMinutes +
                 ", mondayCheckEnabled=" + mondayCheckEnabled +
                 ", monitoringEnabled=" + monitoringEnabled +
-                ", takeTheMailEnabled=" + takeTheMailEnabled +
                 "}";
     }
 }

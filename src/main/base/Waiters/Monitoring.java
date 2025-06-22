@@ -27,70 +27,69 @@ public class Monitoring {
 
     private static final String MINUTES = "MINUTES";
     private static final String SECONDS = "SECONDS";
-    private static boolean picToSend = false;
+    private static final String START_FAILED = "critical_2.png";
+    private static final String SU_FAIL = "critical.png";
+    private static final String EMPTY_TASK_LIST = "zero.png";
+    private static final String SU_BUTTON = "su_button.png";
+    private static final String FARM_COMPLETED = "elites_farm.png";
+
     private static final LauncherConfig config = ConfigManager.loadConfig();
 
     public static void monitorStart() {
 
         while (true) {
             activateWindow(src);
-            if (findAndClickScreenless("critical_2.png")) {
-                restart();
-                sleep(config.getSleepDurationMinutes(), MINUTES);
-                continue;
-            }
-
-            if (findAndClickScreenless("tasks_done.png")) break;
-            sleep(5, MINUTES);
-        }
-
-        while (true) {
-            activateWindow(src);
-            if (findAndClickScreenless("critical.png")) {
-                refresh();
+            if (find(SU_FAIL)) {
+                reenterIntoSU();
                 sleep(20, MINUTES);
                 continue;
             }
 
-            if (findAndClickScreenless("critical_2.png")) {
+            if (find(START_FAILED)) {
                 restart();
                 sleep(20, MINUTES);
                 continue;
             }
 
-            if (check("zero.png") &&
-                check("su_button.png") &&
-                check("elites_farm.png")) {
+            if (find(EMPTY_TASK_LIST) &&
+                    find(SU_BUTTON) &&
+                    find(FARM_COMPLETED)) {
 
-                check(("overview.png"));
-                if (picToSend) sendPhoto();
+                sendPhoto();
 
                 config.setMonitoringEnabled(false);
                 ConfigManager.saveConfig(config);
                 break;
             }
 
-            picToSend = true;
-            check(("overview.png"));
             sleep(20, MINUTES);
         }
     }
 
+    private static boolean find(String picToFind) {
+        return findAndClickScreenless(picToFind);
+    }
+
     public static void monitor() {
-        if (!isProcessRunning()) {
-            StartIsHere.start();
-            sleep(config.getSleepDurationMinutes(), MINUTES);
-        }
+        if (!isProcessRunning()) startBot();
         monitorStart();
         executeEmergencyProtocol();
     }
 
-    private static boolean check(String image) {
-        return findAndClickScreenless(image);
+    private static void startBot() {
+        for (int attempt = 1; attempt <= 5; attempt++) {
+            if (!StartIsHere.start()) continue;
+
+            sleep(30, SECONDS);
+
+            if (find(START_FAILED)) {
+                CloseProcess.terminateProcesses();
+            } else break;
+        }
+        sleep(config.getSleepDurationMinutes(), MINUTES);
     }
 
     private static void executeEmergencyProtocol() {
-        TakeTheMail.take();
         CloseProcess.terminateProcesses();
         performEmergencyShutdown();
     }
@@ -103,7 +102,7 @@ public class Monitoring {
     }
 
 
-    private static void refresh() {
+    private static void reenterIntoSU() {
         activateAndClick(MuMu, CLICK_POINTS, 3000);
         sleep(3, "SECONDS");
         performClick(780, 675, 0);
@@ -138,11 +137,7 @@ public class Monitoring {
 
     private static void restart() {
         CloseProcess.terminateProcesses();
-        for (int i = 0; i <= 3; i++) {
-            if (StartIsHere.start()) break;
-            else if (i == 3) TelegramBotSender
-                    .sendNoteMessage("Не удалось запустить бота");
-        }
+        startBot();
     }
 
     private static boolean isProcessRunning() {

@@ -30,7 +30,6 @@ public class ConfigWindow extends JFrame {
     private JCheckBox reportCheck;
     private JCheckBox mondayCheck;
     private JSpinner sleepDurationSpinner;
-    private JCheckBox takeTheMailCheck;
 
     private JLabel monitoringStatusLabel = new JLabel();
     private JButton monitoringToggleButton = new JButton();
@@ -486,8 +485,7 @@ public class ConfigWindow extends JFrame {
         successCheck = new JCheckBox("Уведомлять об успехе", config.isSuccessNotification());
         failureCheck = new JCheckBox("Уведомлять о неудаче", config.isFailureNotification());
         reportCheck = new JCheckBox("Отправлять отчет", config.isReportNotification());
-        mondayCheck = new JCheckBox("Активировать проверки в понедельник", config.isMondayCheckEnabled());
-        takeTheMailCheck = new JCheckBox("Взять почту", config.isTakeTheMailEnabled());
+        mondayCheck = new JCheckBox("Недельная виртуалка", config.isMondayCheckEnabled());
 
         addLabeledComponent(panel, "Количество попыток:", attemptsSpinner, 0, gbc);
         addLabeledComponent(panel, "Длительность сна (минут):", sleepDurationSpinner, 1, gbc);
@@ -498,7 +496,6 @@ public class ConfigWindow extends JFrame {
         addCheckbox(panel, failureCheck, 3, gbc);
         addCheckbox(panel, reportCheck, 4, gbc);
         addCheckbox(panel, mondayCheck, 5, gbc);
-        addCheckbox(panel, takeTheMailCheck, 6, gbc);
 
         // Блок мониторинга
         gbc.gridy = 7;
@@ -522,7 +519,7 @@ public class ConfigWindow extends JFrame {
         panel.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createTitledBorder(
                         BorderFactory.createLineBorder(PRIMARY_COLOR),
-                        "Состояние мониторинга"
+                        "Прохождение виртуалки"
                 ),
                 BorderFactory.createEmptyBorder(10, 15, 10, 15)
         ));
@@ -608,7 +605,6 @@ public class ConfigWindow extends JFrame {
         config.setFailureNotification(failureCheck.isSelected());
         config.setReportNotification(reportCheck.isSelected());
         config.setMondayCheckEnabled(mondayCheck.isSelected());
-        config.setTakeTheMailEnabled(takeTheMailCheck.isSelected());
 
         config.setBotToken(botTokenField.getText());
         config.setChatId(chatIdField.getText());

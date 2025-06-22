@@ -12,10 +12,13 @@ import java.nio.channels.FileLock;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import static Utils.FindButtonAndPress.findAndClickScreenless;
+
 public class Main {
     private static final String LOCK_FILE = "bot_sources/app.lock";
     private static final LauncherConfig config = ConfigManager.loadConfig();
     public static volatile boolean isRunning = true;
+    private static boolean done = false;
 
     public static void main(String[] args) {
         if (!acquireLock()) {
@@ -25,36 +28,42 @@ public class Main {
         isRunning = true;
 
         try {
-            final int maxAttempts = 3;
-            for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-                CloseProcess.terminateProcesses();
-                System.out.println("\n=== Попытка #" + attempt + " ===");
+            final int maxAttempts = 4;
+            CloseProcess.terminateProcesses();
 
+            for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+                System.out.println("\n=== Попытка #" + attempt + " ===");
                 if (!StartIsHere.start()) continue;
+
+                sleep(30);
+                if (findAndClickScreenless("critical_2.png")) {
+                    restart();
+                    continue;
+                }
 
                 sleep(config.getSleepDurationMinutes() * 60);
 
                 if (EndIsNear.end()) {
                     System.out.println("УСПЕХ! Основной цикл завершен.");
-                        if (config.isSuccessNotification() || attempt > 1)
-                            sendMessages(config.getSuccessMessages());
+                    done = true;
+                    if (config.isSuccessNotification() || attempt > 1)
+                        sendMessages(config.getSuccessMessages());
                     break;
-                } else {
-                    if (attempt < maxAttempts) {
-                        System.out.println("Повтор через 15 секунд...");
-                        sleep(15);
-                    } else {
-                        sendMessages(config.getFailureMessages());
-                    }
                 }
             }
+            if (!done) sendMessages(config.getFailureMessages());
+
         } finally {
             isRunning = false;
             System.out.println("\n=== ЗАВЕРШЕНИЕ РАБОТЫ ===");
-            TakeTheMail.take();
             performFinalCleanup();
             System.exit(0);
         }
+    }
+
+    private static void restart() {
+        CloseProcess.terminateProcesses();
+        sendMessages(config.getReportMessages());
     }
 
     private static void sendMessages(List<String> messages) {

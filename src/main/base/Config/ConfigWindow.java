@@ -243,7 +243,6 @@ public class ConfigWindow extends JFrame {
 
         JPanel successPanel = createMessageSubPanel(
                 "Успех",
-                successMessagesArea,
                 config.getSuccessMessages(),
                 areaFont,
                 borderColor
@@ -251,7 +250,6 @@ public class ConfigWindow extends JFrame {
 
         JPanel failurePanel = createMessageSubPanel(
                 "Ошибки",
-                failureMessagesArea,
                 config.getFailureMessages(),
                 areaFont,
                 borderColor
@@ -259,7 +257,6 @@ public class ConfigWindow extends JFrame {
 
         JPanel reportPanel = createMessageSubPanel(
                 "Отчеты",
-                reportMessagesArea,
                 config.getReportMessages(),
                 areaFont,
                 borderColor
@@ -273,7 +270,7 @@ public class ConfigWindow extends JFrame {
         return panel;
     }
 
-    private JPanel createMessageSubPanel(String title, JTextArea area, List<String> messages,
+    private JPanel createMessageSubPanel(String title, List<String> messages,
                                          Font areaFont, Color borderColor) {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -283,7 +280,7 @@ public class ConfigWindow extends JFrame {
         label.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
         panel.add(label, BorderLayout.NORTH);
 
-        area = new JTextArea(15, 50);
+        JTextArea area = new JTextArea(15, 50);
         area.setFont(areaFont);
         area.setLineWrap(true);
         area.setWrapStyleWord(true);

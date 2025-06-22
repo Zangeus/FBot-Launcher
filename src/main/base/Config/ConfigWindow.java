@@ -12,8 +12,6 @@ import java.util.List;
 
 import Waiters.Main;
 
-import org.w3c.dom.events.MouseEvent;
-
 public class ConfigWindow extends JFrame {
     private final LauncherConfig config = ConfigManager.loadConfig();
     private final Color middleGray = Color.WHITE;//new Color(50, 50, 50);
@@ -409,12 +407,10 @@ public class ConfigWindow extends JFrame {
                 KeyStroke.getKeyStroke("SPACE"), "none"
         );
         button.addActionListener(e -> {
-            Timer pressTimer = new Timer(50, ev -> {
-                button.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(bgColor.darker().darker(), 1),
-                        emptyBorder
-                ));
-            });
+            Timer pressTimer = new Timer(50, ev -> button.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(bgColor.darker().darker(), 1),
+                    emptyBorder
+            )));
             pressTimer.setRepeats(false);
             pressTimer.start();
         });
@@ -635,11 +631,7 @@ public class ConfigWindow extends JFrame {
         repaint();
 
         Point startPoint;
-        if (lastSaveClickPoint != null) {
-            startPoint = lastSaveClickPoint;
-        } else {
-            startPoint = new Point(getWidth() / 2, getHeight() - 50);
-        }
+        startPoint = Objects.requireNonNullElseGet(lastSaveClickPoint, () -> new Point(getWidth() / 2, getHeight() - 50));
 
         Font largeFont = customFont != null ?
                 customFont.deriveFont(36f) :
@@ -691,7 +683,7 @@ public class ConfigWindow extends JFrame {
     }
 
 
-    class BackgroundPanel extends JPanel {
+    static class BackgroundPanel extends JPanel {
         private final Image backgroundImage;
         private final float transparency;
         private Color edgeColor = Color.WHITE;

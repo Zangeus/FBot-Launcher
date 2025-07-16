@@ -27,7 +27,7 @@ public class ConfigWindow extends JFrame {
     private JCheckBox successCheck;
     private JCheckBox failureCheck;
     private JCheckBox reportCheck;
-    private JCheckBox mondayCheck;
+    private JCheckBox weekSUCheck;
     private JSpinner sleepDurationSpinner;
 
     private JLabel monitoringStatusLabel = new JLabel();
@@ -243,21 +243,21 @@ public class ConfigWindow extends JFrame {
 
         JPanel successPanel = createMessageSubPanel(
                 "Успех",
-                config.getSuccessMessages(),
+                successMessagesArea, // Используем поле класса
                 areaFont,
                 borderColor
         );
 
         JPanel failurePanel = createMessageSubPanel(
                 "Ошибки",
-                config.getFailureMessages(),
+                failureMessagesArea, // Используем поле класса
                 areaFont,
                 borderColor
         );
 
         JPanel reportPanel = createMessageSubPanel(
                 "Отчеты",
-                config.getReportMessages(),
+                reportMessagesArea, // Используем поле класса
                 areaFont,
                 borderColor
         );
@@ -270,7 +270,7 @@ public class ConfigWindow extends JFrame {
         return panel;
     }
 
-    private JPanel createMessageSubPanel(String title, List<String> messages,
+    private JPanel createMessageSubPanel(String title, JTextArea area,
                                          Font areaFont, Color borderColor) {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -280,11 +280,9 @@ public class ConfigWindow extends JFrame {
         label.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
         panel.add(label, BorderLayout.NORTH);
 
-        JTextArea area = new JTextArea(15, 50);
         area.setFont(areaFont);
         area.setLineWrap(true);
         area.setWrapStyleWord(true);
-        area.setText(String.join("\n", messages));
 
         JScrollPane scrollPane = new JScrollPane(area);
         scrollPane.setBorder(BorderFactory.createCompoundBorder(
@@ -460,7 +458,7 @@ public class ConfigWindow extends JFrame {
         successCheck = new JCheckBox("Уведомлять об успехе", config.isSuccessNotification());
         failureCheck = new JCheckBox("Уведомлять о неудаче", config.isFailureNotification());
         reportCheck = new JCheckBox("Отправлять отчет", config.isReportNotification());
-        mondayCheck = new JCheckBox("Недельная виртуалка", config.weeklySU_IsEnabled());
+        weekSUCheck = new JCheckBox("Недельная виртуалка", config.isWeekSUEnabled());
 
         addLabeledComponent(panel, "Количество попыток:", attemptsSpinner, 0, gbc);
         addLabeledComponent(panel, "Длительность сна (минут):", sleepDurationSpinner, 1, gbc);
@@ -470,7 +468,7 @@ public class ConfigWindow extends JFrame {
         addCheckbox(panel, successCheck, 2, gbc);
         addCheckbox(panel, failureCheck, 3, gbc);
         addCheckbox(panel, reportCheck, 4, gbc);
-        addCheckbox(panel, mondayCheck, 5, gbc);
+        addCheckbox(panel, weekSUCheck, 5, gbc);
 
         gbc.gridy = 7;
         gbc.weighty = 0.5;
@@ -578,15 +576,21 @@ public class ConfigWindow extends JFrame {
         config.setSuccessNotification(successCheck.isSelected());
         config.setFailureNotification(failureCheck.isSelected());
         config.setReportNotification(reportCheck.isSelected());
-        config.setWeekSU_IsEnabled(mondayCheck.isSelected());
+        config.setWeekSUEnabled(weekSUCheck.isSelected());
 
         config.setBotToken(botTokenField.getText());
         config.setChatId(chatIdField.getText());
         config.setPicsToStartPath(picsPathField.getText());
 
-        config.setSuccessMessages(Arrays.asList(successMessagesArea.getText().split("\n")));
-        config.setFailureMessages(Arrays.asList(failureMessagesArea.getText().split("\n")));
-        config.setReportMessages(Arrays.asList(reportMessagesArea.getText().split("\n")));
+        config.setSuccessMessages(new ArrayList<>(Arrays.asList(
+                successMessagesArea.getText().split("\\R")
+        )));
+        config.setFailureMessages(new ArrayList<>(Arrays.asList(
+                failureMessagesArea.getText().split("\\R")
+        )));
+        config.setReportMessages(new ArrayList<>(Arrays.asList(
+                reportMessagesArea.getText().split("\\R")
+        )));
 
         ConfigManager.saveConfig(config);
         showConfirmationPanel();

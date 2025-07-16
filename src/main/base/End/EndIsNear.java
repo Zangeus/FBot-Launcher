@@ -26,7 +26,7 @@ public class EndIsNear {
 
             if (find(EMPTY_TASK_LIST)) {
 
-                if (config.weeklySU_IsEnabled() && !find(SU_COMPLETED)) {
+                if (config.isWeekSUEnabled() && !find(SU_COMPLETED)) {
                     for (int j = 0; j < 12; j++) {
 
                         focusApplicationWindow();

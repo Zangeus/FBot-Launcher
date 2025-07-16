@@ -57,8 +57,35 @@ public class ConfigWindow extends JFrame {
         successMessagesArea = new JTextArea();
         failureMessagesArea = new JTextArea();
         reportMessagesArea = new JTextArea();
+
         loadCustomFont();
+        setJapaneseFontSupport(); // Добавьте этот метод
         initUI();
+    }
+
+    private void setJapaneseFontSupport() {
+        Font japaneseFont = getJapaneseFont();
+        successMessagesArea.setFont(japaneseFont);
+        failureMessagesArea.setFont(japaneseFont);
+        reportMessagesArea.setFont(japaneseFont);
+    }
+
+    private Font getJapaneseFont() {
+        String[] jpFonts = {
+                "Meiryo", "MS PGothic", "MS PMincho",
+                "MS Gothic", "MS Mincho", "Yu Gothic"
+        };
+
+        // Пробуем найти доступный японский шрифт
+        for (String fontName : jpFonts) {
+            Font font = new Font(fontName, Font.PLAIN, 14);
+            if (font.getFamily().equals(fontName)) {
+                return font;
+            }
+        }
+
+        // Используем стандартный шрифт с широкой поддержкой символов
+        return new Font(Font.SANS_SERIF, Font.PLAIN, 14);
     }
 
     private void initUI() {
@@ -238,26 +265,27 @@ public class ConfigWindow extends JFrame {
         messagesTabbedPane.setFont(HEADER_FONT.deriveFont(16f));
         messagesTabbedPane.setBackground(new Color(245, 245, 245));
 
-        Font areaFont = BASE_FONT.deriveFont(14f);
+        // Используем существующие поля класса вместо создания новых
+        Font areaFont = successMessagesArea.getFont(); // Получаем текущий шрифт
         Color borderColor = new Color(200, 200, 200);
 
         JPanel successPanel = createMessageSubPanel(
                 "Успех",
-                successMessagesArea, // Используем поле класса
+                successMessagesArea, // Используем существующее поле
                 areaFont,
                 borderColor
         );
 
         JPanel failurePanel = createMessageSubPanel(
                 "Ошибки",
-                failureMessagesArea, // Используем поле класса
+                failureMessagesArea, // Используем существующее поле
                 areaFont,
                 borderColor
         );
 
         JPanel reportPanel = createMessageSubPanel(
                 "Отчеты",
-                reportMessagesArea, // Используем поле класса
+                reportMessagesArea, // Используем существующее поле
                 areaFont,
                 borderColor
         );
@@ -280,6 +308,7 @@ public class ConfigWindow extends JFrame {
         label.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
         panel.add(label, BorderLayout.NORTH);
 
+        // Используем переданную область вместо создания новой
         area.setFont(areaFont);
         area.setLineWrap(true);
         area.setWrapStyleWord(true);

@@ -8,7 +8,6 @@ import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.util.*;
-import java.util.List;
 
 import Waiters.Main;
 
@@ -643,23 +642,19 @@ public class ConfigWindow extends JFrame {
         bgPanel.removeAll();
         bgPanel.setLayout(null);
 
-        JPanel animationPanel = new JPanel(null) {
-            @Override
-            protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                Graphics2D g2d = (Graphics2D) g.create();
-                g2d.setComposite(AlphaComposite.SrcOver.derive(0.7f));
-                g2d.setColor(new Color(0, 0, 0, 100));
-                g2d.fillRect(0, 0, getWidth(), getHeight());
-                g2d.dispose();
-            }
-        };
-        animationPanel.setOpaque(false);
-        animationPanel.setBounds(0, 0, getWidth(), getHeight());
+        JPanel animationPanel = getAnimationPanel();
         bgPanel.add(animationPanel);
         revalidate();
         repaint();
 
+        JLabel animatedLabel = getJLabel();
+        animationPanel.add(animatedLabel);
+
+        Timer timer = getTimer(animatedLabel);
+        timer.start();
+    }
+
+    private JLabel getJLabel() {
         Point startPoint;
         startPoint = Objects.requireNonNullElseGet(lastSaveClickPoint, () -> new Point(getWidth() / 2, getHeight() - 50));
 
@@ -676,18 +671,19 @@ public class ConfigWindow extends JFrame {
                 startPoint.x - animatedLabel.getWidth() / 2,
                 startY
         );
-        animationPanel.add(animatedLabel);
+        return animatedLabel;
+    }
 
+    private Timer getTimer(JLabel animatedLabel) {
         final int[] time = {0};
         final int animationDuration = 24; // 50 кадров * 20 мс = 1000 мс (1 секунда)
 
-        Timer timer = new Timer(20, e -> {
+        return new Timer(20, e -> {
             time[0]++;
 
             float hue = (time[0] * 3f) % animationDuration / animationDuration;
             Color color = Color.getHSBColor(hue, 0.95f, 1.0f);
 
-            // Плавное затухание в конце анимации
             float alpha = 1.0f;
             if (time[0] > animationDuration * 0.7) {
                 alpha = 1.0f - (time[0] - animationDuration * 0.7f) / (animationDuration * 0.3f);
@@ -709,7 +705,23 @@ public class ConfigWindow extends JFrame {
 
             repaint();
         });
-        timer.start();
+    }
+
+    private JPanel getAnimationPanel() {
+        JPanel animationPanel = new JPanel(null) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setComposite(AlphaComposite.SrcOver.derive(0.7f));
+                g2d.setColor(new Color(0, 0, 0, 100));
+                g2d.fillRect(0, 0, getWidth(), getHeight());
+                g2d.dispose();
+            }
+        };
+        animationPanel.setOpaque(false);
+        animationPanel.setBounds(0, 0, getWidth(), getHeight());
+        return animationPanel;
     }
 
 

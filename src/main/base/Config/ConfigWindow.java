@@ -460,7 +460,7 @@ public class ConfigWindow extends JFrame {
         successCheck = new JCheckBox("Уведомлять об успехе", config.isSuccessNotification());
         failureCheck = new JCheckBox("Уведомлять о неудаче", config.isFailureNotification());
         reportCheck = new JCheckBox("Отправлять отчет", config.isReportNotification());
-        mondayCheck = new JCheckBox("Недельная виртуалка", config.isMondayCheckEnabled());
+        mondayCheck = new JCheckBox("Недельная виртуалка", config.weeklySU_IsEnabled());
 
         addLabeledComponent(panel, "Количество попыток:", attemptsSpinner, 0, gbc);
         addLabeledComponent(panel, "Длительность сна (минут):", sleepDurationSpinner, 1, gbc);
@@ -578,7 +578,7 @@ public class ConfigWindow extends JFrame {
         config.setSuccessNotification(successCheck.isSelected());
         config.setFailureNotification(failureCheck.isSelected());
         config.setReportNotification(reportCheck.isSelected());
-        config.setMondayCheckEnabled(mondayCheck.isSelected());
+        config.setWeekSU_IsEnabled(mondayCheck.isSelected());
 
         config.setBotToken(botTokenField.getText());
         config.setChatId(chatIdField.getText());

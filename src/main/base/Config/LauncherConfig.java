@@ -26,7 +26,7 @@ public class LauncherConfig {
     private boolean reportWithScreenshot = false;
     private int sleepDurationMinutes = 12;
     //Виртуалка на 14к
-    private boolean mondayCheckEnabled = true;
+    private boolean weekSU_IsEnabled = true;
     private boolean monitoringEnabled = true;
 
     public boolean isMonitoringEnabled() {
@@ -37,12 +37,12 @@ public class LauncherConfig {
         this.monitoringEnabled = monitoringEnabled;
     }
 
-    public boolean isMondayCheckEnabled() {
-        return mondayCheckEnabled;
+    public boolean weeklySU_IsEnabled() {
+        return weekSU_IsEnabled;
     }
 
-    public void setMondayCheckEnabled(boolean mondayCheckEnabled) {
-        this.mondayCheckEnabled = mondayCheckEnabled;
+    public void setWeekSU_IsEnabled(boolean weekSU_IsEnabled) {
+        this.weekSU_IsEnabled = weekSU_IsEnabled;
     }
 
     public int getSleepDurationMinutes() {
@@ -197,7 +197,7 @@ public class LauncherConfig {
                 ", failureNotification=" + failureNotification +
                 ", reportNotification=" + reportNotification +
                 ", sleepDurationMinutes=" + sleepDurationMinutes +
-                ", mondayCheckEnabled=" + mondayCheckEnabled +
+                ", mondayCheckEnabled=" + weekSU_IsEnabled +
                 ", monitoringEnabled=" + monitoringEnabled +
                 "}";
     }

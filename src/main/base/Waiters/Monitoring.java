@@ -102,7 +102,7 @@ public class Monitoring {
     }
 
 
-    private static void reenterIntoSU() {
+    public static void reenterIntoSU() {
         activateAndClick(MuMu, CLICK_POINTS, 3000);
         sleep(3, "SECONDS");
         performClick(780, 675, 0);

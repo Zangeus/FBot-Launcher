@@ -6,9 +6,9 @@ import com.sun.jna.platform.win32.User32;
 import com.sun.jna.platform.win32.WinDef;
 import com.sun.jna.platform.win32.WinUser;
 
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
 
-import static Utils.FindButtonAndPress.*;
+import static Utils.FindButtonAndPress.findAndClickScreenless;
 import static Waiters.Monitoring.reenterIntoSU;
 
 public class EndIsNear {
@@ -19,36 +19,45 @@ public class EndIsNear {
     private static final String SU_FAILED_RUN = "critical.png";
     private static final String LAUNCHER_FAIL = "critical_2.png";
 
+    private static final int MAX_MAIN_ATTEMPTS = 7;
+    private static final int MAX_SU_ATTEMPTS = 12;
+    private static final Duration SHORT_SLEEP = Duration.ofMinutes(1);
+    private static final Duration LONG_SLEEP = Duration.ofMinutes(3);
+
     public static boolean end() {
 
-        for (int i = 0; i < 7; i++) {
+        for (int i = 0; i < MAX_MAIN_ATTEMPTS; i++) {
             if (find(LAUNCHER_FAIL)) return false;
 
             if (find(EMPTY_TASK_LIST)) {
+                if (config.isWeekSUEnabled() && !find(SU_COMPLETED))
+                    return processWeeklySU();
 
-                if (config.isWeekSUEnabled() && !find(SU_COMPLETED)) {
-                    for (int j = 0; j < 12; j++) {
-
-                        focusApplicationWindow();
-                        if (find(SU_COMPLETED)) return true;
-                        else if (find(SU_FAILED_RUN)) reenterIntoSU();
-                        else sleep(3);
-                    }
-                } else return true;
-
-            } else sleep(1);
+                return true;
+            }
+            sleep(SHORT_SLEEP);
         }
-
         return false;
     }
 
-    private static boolean find(String picToFind) {
-        return findAndClickScreenless(picToFind);
+    private static boolean processWeeklySU() {
+        for (int j = 0; j < MAX_SU_ATTEMPTS; j++) {
+            if (find(SU_COMPLETED)) return true;
+            if (find(SU_FAILED_RUN)) reenterIntoSU();
+
+            sleep(LONG_SLEEP);
+        }
+        return false;
     }
 
-    private static void sleep(int minutes) {
+    private static boolean find(String image) {
+        focusApplicationWindow();
+        return findAndClickScreenless(image);
+    }
+
+    private static void sleep(Duration duration) {
         try {
-            TimeUnit.MINUTES.sleep(minutes);
+            Thread.sleep(duration.toMillis());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

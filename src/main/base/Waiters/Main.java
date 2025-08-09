@@ -28,10 +28,13 @@ public class Main {
         isRunning = true;
 
         try {
-            final int maxAttempts = 4;
-            CloseProcess.terminateProcesses();
+            final int maxAttempts = 3;
 
             for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+
+                System.out.println("\nУбираем окна, чтобы не отслеживать ошибки");
+                CloseProcess.terminateProcesses();
+
                 System.out.println("\n=== Попытка #" + attempt + " ===");
                 if (!StartIsHere.start()) continue;
 
@@ -51,10 +54,10 @@ public class Main {
                     break;
                 }
             }
-            if (!done) sendMessages(config.getFailureMessages());
-
         } finally {
+            if (!done) sendMessages(config.getFailureMessages());
             isRunning = false;
+
             System.out.println("\n=== ЗАВЕРШЕНИЕ РАБОТЫ ===");
             performFinalCleanup();
             System.exit(0);

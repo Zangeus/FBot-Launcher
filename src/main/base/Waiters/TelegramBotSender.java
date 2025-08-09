@@ -196,4 +196,79 @@ public class TelegramBotSender {
             System.err.println("Ошибка отправки локального фото: " + e.getMessage());
         }
     }
+
+    public static void sendPhotos(List<byte[]> photos, String message) {
+        if (!validateConfig() || photos == null || photos.isEmpty()) return;
+
+        try {
+            String urlString = API_URL + config.getBotToken() + "/sendMediaGroup";
+            String boundary = "Boundary-" + System.currentTimeMillis();
+
+            HttpURLConnection connection = (HttpURLConnection) new URL(urlString).openConnection();
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+            try (OutputStream os = connection.getOutputStream();
+                 PrintWriter writer = new PrintWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8))) {
+
+                // Добавляем chat_id
+                writer.append("--").append(boundary).append("\r\n");
+                writer.append("Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n");
+                writer.append(config.getChatId()).append("\r\n");
+
+                // Формируем JSON для медиагруппы
+                writer.append("--").append(boundary).append("\r\n");
+                writer.append("Content-Disposition: form-data; name=\"media\"\r\n");
+                writer.append("Content-Type: application/json\r\n\r\n");
+
+                writer.append("[");
+                for (int i = 0; i < photos.size(); i++) {
+                    if (i > 0) writer.append(",");
+                    writer.append(String.format(
+                            "{\"type\":\"photo\",\"media\":\"attach://file%d\"}",
+                            i
+                    ));
+                }
+                writer.append("]\r\n");
+
+                // Добавляем файлы изображений
+                for (int i = 0; i < photos.size(); i++) {
+                    writer.append("--").append(boundary).append("\r\n");
+                    writer.append(String.format(
+                            "Content-Disposition: form-data; name=\"file%d\"; filename=\"screenshot%d.png\"\r\n",
+                            i, i
+                    ));
+                    writer.append("Content-Type: image/png\r\n\r\n");
+                    writer.flush();
+
+                    os.write(photos.get(i));
+                    os.flush();
+
+                    writer.append("\r\n");
+                }
+
+                // Завершаем запрос
+                writer.append("--").append(boundary).append("--\r\n");
+                writer.flush();
+            }
+
+            // Обрабатываем ответ
+            int responseCode = connection.getResponseCode();
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                System.err.println("Ошибка отправки медиагруппы. Код: " + responseCode);
+                readErrorResponse(connection);
+            }
+
+            // Отправляем текстовое сообщение отдельно
+            if (message != null && !message.isEmpty()) {
+                sendRequest("sendMessage", "text", message);
+            }
+
+            connection.disconnect();
+        } catch (Exception e) {
+            System.err.println("Ошибка отправки медиагруппы: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
 }

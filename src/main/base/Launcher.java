@@ -1,5 +1,5 @@
 import Config.ConfigManager;
-import Config.ConfigWindow;
+import Config.ConfigWindowStructure.ConfigWindow;
 import Config.LauncherConfig;
 import Waiters.Main;
 import Waiters.Monitoring;

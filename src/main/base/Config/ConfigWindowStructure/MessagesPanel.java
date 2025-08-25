@@ -26,15 +26,12 @@ public class MessagesPanel extends JPanel {
         JTabbedPane messagesTabbedPane = new JTabbedPane();
         messagesTabbedPane.setFont(StyleManager.HEADER_FONT.deriveFont(16f));
 
-        // Панель для сообщений об успехе
         successMessagesArea = new JTextArea();
         JPanel successPanel = createMessageSubPanel("Успех", successMessagesArea);
 
-        // Панель для сообщений об ошибках
         failureMessagesArea = new JTextArea();
         JPanel failurePanel = createMessageSubPanel("Ошибки", failureMessagesArea);
 
-        // Панель для отчетов
         reportMessagesArea = new JTextArea();
         JPanel reportPanel = createMessageSubPanel("Отчеты", reportMessagesArea);
 

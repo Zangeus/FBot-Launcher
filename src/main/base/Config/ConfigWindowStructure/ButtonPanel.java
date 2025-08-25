@@ -1,7 +1,5 @@
 package Config.ConfigWindowStructure;
 
-import Config.LauncherConfig;
-
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;

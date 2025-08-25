@@ -20,11 +20,9 @@ public class BackgroundPanel extends JPanel {
         setLayout(new BorderLayout());
         calculateEdgeColor();
 
-        // Добавляем обработчики мыши для перемещения
         addMouseListeners();
     }
 
-    // Устанавливаем ссылку на окно
     public void setWindow(Window window) {
         this.window = window;
     }
@@ -72,17 +70,14 @@ public class BackgroundPanel extends JPanel {
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g.create();
 
-        // Заливаем фон цветом края
         g2d.setColor(edgeColor);
         g2d.fillRect(0, 0, getWidth(), getHeight());
 
-        // Рисуем фоновое изображение с прозрачностью
         if (backgroundImage != null) {
             g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
                     RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, transparency));
 
-            // Масштабируем изображение для заполнения панели с сохранением пропорций
             double widthRatio = (double) getWidth() / backgroundImage.getWidth(null);
             double heightRatio = (double) getHeight() / backgroundImage.getHeight(null);
             double scale = Math.max(widthRatio, heightRatio);

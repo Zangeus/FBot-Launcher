@@ -20,7 +20,6 @@ public class ConfigWindow extends JFrame {
     private static final int MIN_WIDTH = 800;
     private static final int MAX_WIDTH = 950;
     private static final int PREF_HEIGHT = 600;
-    private static final Color MIDDLE_GRAY = Color.WHITE;
 
     public ConfigWindow() {
         config = ConfigManager.loadConfig();
@@ -36,7 +35,6 @@ public class ConfigWindow extends JFrame {
         setUndecorated(true);
         setLocationRelativeTo(null);
 
-        // Установка иконки
         try {
             ImageIcon icon = new ImageIcon(Objects.requireNonNull(getClass().getResource("/icon.png")));
             if (icon.getImage() != null) {
@@ -46,7 +44,6 @@ public class ConfigWindow extends JFrame {
             System.err.println("Не удалось загрузить иконку: " + e.getMessage());
         }
 
-        // Установка размеров окна
         Image backgroundImage = null;
         try {
             ImageIcon bgIcon = new ImageIcon(new File(
@@ -56,7 +53,7 @@ public class ConfigWindow extends JFrame {
             System.err.println("Не удалось загрузить фоновое изображение: " + e.getMessage());
         }
 
-        int calculatedWidth = Math.min(Math.max(MIN_WIDTH, 900), MAX_WIDTH);
+        int calculatedWidth = Math.max(MIN_WIDTH, 900);
 
         setSize(calculatedWidth, PREF_HEIGHT);
         setPreferredSize(new Dimension(calculatedWidth, PREF_HEIGHT));
@@ -65,13 +62,11 @@ public class ConfigWindow extends JFrame {
         setResizable(false);
         setLocationRelativeTo(null);
 
-        // Создание фоновой панели
         BackgroundPanel bgPanel = new BackgroundPanel(backgroundImage, 0.75f);
         bgPanel.setOpaque(true);
         bgPanel.setWindow(this);
         setContentPane(bgPanel);
 
-        // Обработчик закрытия окна
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosed(WindowEvent e) {
@@ -81,7 +76,6 @@ public class ConfigWindow extends JFrame {
             }
         });
 
-        // Добавляем кнопку закрытия в углу
         addCloseButton(bgPanel);
 
         initComponents();
@@ -116,11 +110,10 @@ public class ConfigWindow extends JFrame {
     }
 
     private void initComponents() {
-        // Создание вкладок с улучшенным дизайном
+
         tabbedPane = new JTabbedPane();
         tabbedPane.setFont(StyleManager.HEADER_FONT);
 
-        // Добавляем тень к панелям вкладок
         JPanel generalPanel = new GeneralPanel(config);
         JPanel telegramPanel = new TelegramPanel(config);
         JPanel pathsPanel = new PathsPanel(config);
@@ -131,13 +124,9 @@ public class ConfigWindow extends JFrame {
         tabbedPane.addTab("Пути", pathsPanel);
         tabbedPane.addTab("Сообщения", messagesPanel);
 
-        // Улучшаем внешний вид вкладок
         tabbedPane.setOpaque(false);
 
-        // Создание панели кнопок
         ButtonPanel buttonPanel = new ButtonPanel(this);
-
-        // Добавление компонентов на фоновую панель
         BackgroundPanel bgPanel = (BackgroundPanel) getContentPane();
 
         JPanel centerPanel = new JPanel(new BorderLayout());
@@ -165,14 +154,12 @@ public class ConfigWindow extends JFrame {
         }
     }
 
-    public boolean saveConfig() {
-        // Получаем данные из всех панелей
+    public void saveConfig() {
         GeneralPanel generalPanel = (GeneralPanel) tabbedPane.getComponentAt(0);
         TelegramPanel telegramPanel = (TelegramPanel) tabbedPane.getComponentAt(1);
         PathsPanel pathsPanel = (PathsPanel) tabbedPane.getComponentAt(2);
         MessagesPanel messagesPanel = (MessagesPanel) tabbedPane.getComponentAt(3);
 
-        // Обновляем конфигурацию
         config.setAttemptsAmount(generalPanel.getAttemptsAmount());
         config.setSleepDurationMinutes(generalPanel.getSleepDuration());
         config.setSuccessNotification(generalPanel.isSuccessNotificationEnabled());
@@ -189,14 +176,12 @@ public class ConfigWindow extends JFrame {
         config.setFailureMessages(messagesPanel.getFailureMessages());
         config.setReportMessages(messagesPanel.getReportMessages());
 
-        // Сохраняем конфигурацию
-        return ConfigManager.saveConfig(config);
+        ConfigManager.saveConfig(config);
     }
 
     public void showConfirmationPanel(Point clickPoint) {
         this.lastSaveClickPoint = clickPoint;
 
-        // Восстанавливаем фоновую панель
         BackgroundPanel bgPanel = (BackgroundPanel) getContentPane();
         bgPanel.removeAll();
         bgPanel.setLayout(null);
@@ -275,7 +260,6 @@ public class ConfigWindow extends JFrame {
                     (int)(alpha * 255)
             ));
 
-            // Завершение анимации через 1 секунду
             if (time[0] >= animationDuration) {
                 ((Timer) e.getSource()).stop();
                 dispose();
@@ -293,7 +277,6 @@ public class ConfigWindow extends JFrame {
         private JCheckBox failureCheck;
         private JCheckBox reportCheck;
         private JCheckBox weekSUCheck;
-        private JCheckBox monitoringCheck;
         private JLabel monitoringStatusLabel;
         private JButton monitoringToggleButton;
 
@@ -310,11 +293,9 @@ public class ConfigWindow extends JFrame {
             gbc.anchor = GridBagConstraints.WEST;
             gbc.fill = GridBagConstraints.HORIZONTAL;
 
-            // Добавьте эти строки для правильного распределения пространства
-            gbc.weightx = 1.0; // Компоненты будут растягиваться по горизонтали
-            gbc.weighty = 0;   // По вертикали не растягиваем
+            gbc.weightx = 1.0;
+            gbc.weighty = 0;
 
-            // Заголовок
             JLabel header = new JLabel("Основные настройки");
             header.setFont(StyleManager.HEADER_FONT.deriveFont(18f));
             header.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
@@ -323,10 +304,8 @@ public class ConfigWindow extends JFrame {
             gbc.gridy = 0;
             add(header, gbc);
 
-            // Сброс gridwidth для остальных компонентов
             gbc.gridwidth = 1;
 
-            // Количество попыток
             JLabel attemptsLabel = new JLabel("Количество попыток:");
             attemptsLabel.setFont(StyleManager.BASE_FONT);
             gbc.gridy = 1;
@@ -340,7 +319,6 @@ public class ConfigWindow extends JFrame {
             gbc.weightx = 1.0; // Поле ввода растягивается
             add(attemptsSpinner, gbc);
 
-            // Длительность сна
             JLabel sleepLabel = new JLabel("Длительность сна (минут):");
             sleepLabel.setFont(StyleManager.BASE_FONT);
             gbc.gridx = 0;
@@ -354,11 +332,9 @@ public class ConfigWindow extends JFrame {
             gbc.weightx = 1.0;
             add(sleepDurationSpinner, gbc);
 
-            // Для чекбоксов используем полную ширину
             gbc.gridwidth = 2;
             gbc.weightx = 1.0;
 
-            // Чекбоксы уведомлений
             successCheck = new JCheckBox("Уведомлять об успехе");
             successCheck.setFont(StyleManager.BASE_FONT);
             gbc.gridx = 0;
@@ -454,7 +430,6 @@ public class ConfigWindow extends JFrame {
             updateMonitoringButtonStyle();
         }
 
-        // Методы для получения значений
         public int getAttemptsAmount() {
             return (Integer) attemptsSpinner.getValue();
         }

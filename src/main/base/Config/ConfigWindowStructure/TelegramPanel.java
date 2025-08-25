@@ -23,38 +23,13 @@ public class TelegramPanel extends JPanel {
         gbc.anchor = GridBagConstraints.WEST;
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        JLabel header = new JLabel("Настройки Telegram");
-        header.setFont(StyleManager.HEADER_FONT.deriveFont(18f));
-        header.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
-        gbc.gridwidth = 2;
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        add(header, gbc);
-
-        JLabel tokenLabel = new JLabel("Bot Token:");
-        tokenLabel.setFont(StyleManager.BASE_FONT);
-        gbc.gridwidth = 1;
-        gbc.gridy = 1;
-        gbc.gridx = 0;
-        add(tokenLabel, gbc);
+        PanelHelper.addHeader(this, "Настройки Telegram", gbc, 0);
 
         botTokenField = new JTextField(25);
-        botTokenField.setFont(StyleManager.BASE_FONT);
-        botTokenField.setBorder(StyleManager.createTextFieldBorder());
-        gbc.gridx = 1;
-        add(botTokenField, gbc);
-
-        JLabel chatIdLabel = new JLabel("Chat ID:");
-        chatIdLabel.setFont(StyleManager.BASE_FONT);
-        gbc.gridx = 0;
-        gbc.gridy = 2;
-        add(chatIdLabel, gbc);
+        PanelHelper.addLabeledTextField(this, "Bot Token:", botTokenField, gbc, 1);
 
         chatIdField = new JTextField(25);
-        chatIdField.setFont(StyleManager.BASE_FONT);
-        chatIdField.setBorder(StyleManager.createTextFieldBorder());
-        gbc.gridx = 1;
-        add(chatIdField, gbc);
+        PanelHelper.addLabeledTextField(this, "Chat ID:", chatIdField, gbc, 2);
 
         botTokenField.setToolTipText("<html>Токен вашего Telegram бота<br>Пример: 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11</html>");
         chatIdField.setToolTipText("<html>ID чата для отправки уведомлений<br>Пример: -1001234567890</html>");

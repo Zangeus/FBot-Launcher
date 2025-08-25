@@ -25,30 +25,11 @@ public class PathsPanel extends JPanel {
         gbc.anchor = GridBagConstraints.WEST;
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // Заголовок
-        JLabel header = new JLabel("Настройки путей");
-        header.setFont(StyleManager.HEADER_FONT.deriveFont(18f));
-        header.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
-        gbc.gridwidth = 2;
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        add(header, gbc);
-
-        // Поле для пути к изображениям
-        JLabel pathLabel = new JLabel("Путь к изображениям:");
-        pathLabel.setFont(StyleManager.BASE_FONT);
-        gbc.gridwidth = 1;
-        gbc.gridy = 1;
-        gbc.gridx = 0;
-        add(pathLabel, gbc);
+        PanelHelper.addHeader(this, "Настройки путей", gbc, 0);
 
         picsPathField = new JTextField(25);
-        picsPathField.setFont(StyleManager.BASE_FONT);
-        picsPathField.setBorder(StyleManager.createTextFieldBorder());
-        gbc.gridx = 1;
-        add(picsPathField, gbc);
+        PanelHelper.addLabeledTextField(this, "Путь к изображениям:", picsPathField, gbc, 1);
 
-        // Кнопка "Обзор"
         JButton browseBtn = new JButton("Обзор...");
         StyleManager.styleButton(browseBtn, StyleManager.PRIMARY_COLOR, Color.WHITE);
         browseBtn.setPreferredSize(new Dimension(120, 35));
@@ -57,7 +38,6 @@ public class PathsPanel extends JPanel {
         gbc.fill = GridBagConstraints.NONE;
         add(browseBtn, gbc);
 
-        // Кнопка "Открыть руководство"
         JButton openReadmeBtn = new JButton("Открыть руководство");
         StyleManager.styleButton(openReadmeBtn, StyleManager.WARNING_COLOR, Color.WHITE);
         openReadmeBtn.setPreferredSize(new Dimension(200, 35));
@@ -68,14 +48,16 @@ public class PathsPanel extends JPanel {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         add(openReadmeBtn, gbc);
 
-        // Разделитель
         JSeparator separator = new JSeparator(SwingConstants.HORIZONTAL);
         separator.setForeground(new Color(220, 220, 220));
         gbc.gridy = 3;
         gbc.insets = new Insets(20, 0, 10, 0);
         add(separator, gbc);
 
-        // Пустое пространство
+        gbc.gridy = 4;
+        gbc.weighty = 1.0;
+        add(Box.createGlue(), gbc);
+
         gbc.gridy = 4;
         gbc.weighty = 1.0;
         add(Box.createGlue(), gbc);

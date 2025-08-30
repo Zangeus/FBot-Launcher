@@ -25,7 +25,6 @@ public class EndIsNear {
     private static final Duration LONG_SLEEP = Duration.ofMinutes(3);
 
     public static boolean end() {
-
         for (int i = 0; i < MAX_MAIN_ATTEMPTS; i++) {
             if (find(LAUNCHER_FAIL)) return false;
 

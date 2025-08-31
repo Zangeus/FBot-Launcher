@@ -12,6 +12,7 @@ import java.nio.channels.FileLock;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import static Utils.ClickByCoords.activateWindow;
 import static Utils.FindButtonAndPress.findAndClickScreenless;
 
 public class Main {
@@ -38,7 +39,10 @@ public class Main {
                 System.out.println("\n=== Попытка #" + attempt + " ===");
                 if (!StartIsHere.start()) continue;
 
+                System.out.println("Ждем 30 секунд перед проверкой на ошибки лога");
+
                 sleep(30);
+                activateWindow("src");
                 if (findAndClickScreenless("critical_2.png")) {
                     restart();
                     continue;

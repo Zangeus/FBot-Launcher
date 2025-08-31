@@ -10,7 +10,11 @@ public class StartIsHere {
 
     private static Process startedProcess; // сохраним процесс
 
-    public static boolean start() {
+    public static void start() {
+        start(1);
+    }
+
+    public static boolean start(int attempt) {
         try {
             String processToStart =
                     "Q:\\Z-folder\\Bot_time\\StarRailCopilot\\src.exe";
@@ -40,7 +44,9 @@ public class StartIsHere {
                 }
             }
 
-            return findAndClickWithOneMessage("start.png", "Не удалось найти кнопку запуска");
+            return attempt != 3 ? findAndClick("start.png") :
+                    findAndClickWithMessage("start.png", "Не удалось найти кнопку Start!");
+
 
         } catch (Exception e) {
             System.err.println("Ошибка при запуске приложения: " + e.getMessage());

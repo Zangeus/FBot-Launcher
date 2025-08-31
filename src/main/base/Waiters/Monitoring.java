@@ -67,7 +67,7 @@ public class Monitoring {
     }
 
     private static boolean find(String picToFind) {
-        return findAndClickScreenless(picToFind);
+        return findAndClickSilent(picToFind);
     }
 
     public static void monitor() {
@@ -78,7 +78,7 @@ public class Monitoring {
 
     private static void startBot() {
         for (int attempt = 1; attempt <= 5; attempt++) {
-            if (!StartIsHere.start()) continue;
+            if (!StartIsHere.start(attempt)) continue;
 
             sleep(30, SECONDS);
 
@@ -108,7 +108,7 @@ public class Monitoring {
         performClick(780, 675, 0);
 
         ClickByCoords.focusWindow(src);
-        findAndClickWithOneMessage("start_button.png", "Не удалось найти кнопку запуска");
+        findAndClickWithMessage("start_button.png", "Не удалось найти кнопку запуска");
     }
 
     private static void sleep(int amount, String type) {

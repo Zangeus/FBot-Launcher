@@ -16,7 +16,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import static Utils.FindButtonAndPress.findAndClickScreenless;
 
 public class Main {
     private static final String LOCK_FILE = "bot_sources/app.lock";
@@ -38,14 +37,12 @@ public class Main {
                 CloseProcess.closeAll();
 
                 System.out.println("\n=== Попытка #" + attempt + " ===");
-                if (!StartIsHere.start()) continue;
+                if (!StartIsHere.start(attempt)) continue;
 
-                // --- Новый блок вместо findAndClickScreenless ---
-                if (waitForError()) {  // ждём 30 секунд ошибку
+                if (waitForError()) {
                     restart();
                     continue;
                 }
-                // -------------------------------------------------
 
                 sleep(config.getSleepDurationMinutes() * 60);
 
@@ -58,7 +55,9 @@ public class Main {
                 }
             }
         } finally {
-            if (!done) sendMessages(config.getFailureMessages());
+            if (!done) {
+                sendMessages(config.getFailureMessages());
+            }
             isRunning = false;
 
             System.out.println("\n=== ЗАВЕРШЕНИЕ РАБОТЫ ===");
@@ -66,6 +65,7 @@ public class Main {
             System.exit(0);
         }
     }
+
 
     private static boolean waitForError() {
         ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -148,6 +148,10 @@ public class Main {
         } catch (IOException e) {
             return false;
         }
+    }
+
+    public static int getMaxAttempts() {
+        return maxAttempts;
     }
 
     public static boolean isRunning() {

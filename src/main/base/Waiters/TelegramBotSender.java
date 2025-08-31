@@ -74,6 +74,10 @@ public class TelegramBotSender {
     // -----------------------
     // Упрощённые обёртки
     // -----------------------
+    public static void send(File file, String caption) {
+        send((Object) file, caption);
+    }
+
     public static void sendText(String text) {
         send(text, null);
     }

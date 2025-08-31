@@ -8,7 +8,7 @@ import com.sun.jna.platform.win32.WinUser;
 
 import java.time.Duration;
 
-import static Utils.FindButtonAndPress.findAndClickScreenless;
+import static Utils.FindButtonAndPress.findAndClickSilent;
 import static Waiters.Monitoring.reenterIntoSU;
 
 public class EndIsNear {
@@ -51,7 +51,7 @@ public class EndIsNear {
 
     private static boolean find(String image) {
         focusApplicationWindow();
-        return findAndClickScreenless(image);
+        return findAndClickSilent(image);
     }
 
     private static void sleep(Duration duration) {

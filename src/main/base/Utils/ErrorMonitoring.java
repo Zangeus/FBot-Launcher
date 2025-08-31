@@ -39,14 +39,14 @@ public class ErrorMonitoring {
 
             WatchKey key = watcher.poll(timeoutSeconds, TimeUnit.SECONDS);
             if (key == null) {
-                return false; // ничего не появилось за timeout
+                return false;
             }
 
             for (WatchEvent<?> event : key.pollEvents()) {
                 Path newPath = dir.resolve((Path) event.context());
                 if (Files.isDirectory(newPath)) {
                     handleErrorFolder(newPath.toFile());
-                    return true; // нашли ошибку → рестарт
+                    return true;
                 }
             }
             return false;

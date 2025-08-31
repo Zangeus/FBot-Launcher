@@ -161,10 +161,18 @@ public class TelegramBotSender {
     // -----------------------
     // Случайное сообщение
     // -----------------------
+    public static void sendRandomMessage(List<String> messages) {
+        sendRandomMessage(messages, null);
+    }
+
     public static void sendRandomMessage(List<String> messages, String extra) {
-        String baseMessage = getRandomMessage(messages);
-        if (isInvalidMessage(baseMessage)) return;
-        send(baseMessage, extra);
+        if (messages != null && !messages.isEmpty()) {
+            String baseMessage = getRandomMessage(messages);
+            if (isInvalidMessage(baseMessage)) return;
+            send(baseMessage, extra);
+        } else {
+            System.err.println("Список сообщений пуст, отправка отменена");
+        }
     }
 
     private static String getRandomMessage(List<String> messages) {

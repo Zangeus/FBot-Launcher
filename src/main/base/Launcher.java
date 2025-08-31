@@ -2,7 +2,7 @@ import Config.ConfigManager;
 import Config.ConfigWindowStructure.ConfigWindow;
 import Config.LauncherConfig;
 import Waiters.Main;
-import Waiters.Monitoring;
+//import Waiters.SU_related;
 
 import javax.swing.*;
 
@@ -22,7 +22,7 @@ public class Launcher {
     private static void startMainApplication(LauncherConfig config, String[] args) {
 
         if (!config.isMonitoringEnabled())
-            Main.main(args);
-        else Monitoring.monitor();
+            Main.start();
+        else Main.start(999);
     }
 }

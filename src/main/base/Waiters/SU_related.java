@@ -16,8 +16,8 @@ import static Utils.ClickByCoords.activateAndClick;
 import static Utils.ClickByCoords.performClick;
 import static Utils.FindButtonAndPress.*;
 
-public class Monitoring {
-    private static final String MuMu = "MuMu Player 12";
+public class SU_related {
+    private static final String MuMu = "Android Device";
     private static final String src = "src";
     private static final Point[] CLICK_POINTS = {
             new Point(970, 444),
@@ -95,9 +95,7 @@ public class Monitoring {
     }
 
     public static void sendPhoto() {
-        String imagePath = "bot_sources/SU.png";
-        TelegramBotSender.sendLocalPhoto(imagePath);
-
+        TelegramBotSender.sendLocalPhoto("bot_sources/SU.png");
         TelegramBotSender.sendText("Исследование Виртуальной вселенной завершено");
     }
 
@@ -149,7 +147,7 @@ public class Monitoring {
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String line;
             while ((line = reader.readLine()) != null) {
-                if (line.contains(Monitoring.src)) {
+                if (line.contains(SU_related.src)) {
                     return true;
                 }
             }

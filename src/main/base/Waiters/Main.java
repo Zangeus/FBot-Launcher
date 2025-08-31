@@ -24,18 +24,22 @@ public class Main {
     private static volatile boolean isRunning = true;
     private static boolean done = false;
     private static final int timeoutSeconds = 30;
+    private static int maxAttempts = 3;
 
     public static void start() {
-        start(3);
-    }
-
-    public static void start(int maxAttempts) {
         if (!acquireLock()) {
             System.err.println("Программа уже запущена! Выход...");
             return;
         }
-
         isRunning = true;
+
+        boolean isSURun = false;
+        if (config.isMonitoringEnabled()) {
+            maxAttempts = 999;
+            isSURun = true;
+            Utils.ConfigJson.setWeeklyFarming(true);
+        } else Utils.ConfigJson.setWeeklyFarming(false);
+
         try {
             ErrorMonitoring.startAsync();
             EndWatcher.startAsync();
@@ -52,7 +56,7 @@ public class Main {
                 }
 
                 while (isRunning) {
-                    if (EndWatcher.isStoppedSuccessfully()) {
+                    if (EndWatcher.isStoppedSuccessfully() || Utils.ConfigJson.isSUCompleted()) {
                         done = true;
                         break;
                     }
@@ -60,7 +64,7 @@ public class Main {
                         restart();
                         break;
                     }
-                    sleep(1);
+                    sleepOneSecond();
                 }
 
                 if (done) {
@@ -72,11 +76,11 @@ public class Main {
             EndWatcher.stop();
 
             if (done) {
-                //Indicator of Su
-                if (maxAttempts < 50) {
+                if (!isSURun) {
                     if (config.isSuccessNotification()) sendRandomMessage(config.getSuccessMessages());
                     performEmergencyShutdown();
                 } else completeSU();
+
             } else {
                 if (config.isFailureNotification()) sendRandomMessage(config.getFailureMessages());
                 performEmergencyShutdown();
@@ -84,7 +88,6 @@ public class Main {
 
             performFinalCleanup();
         }
-
     }
 
     private static boolean waitForError() {
@@ -104,9 +107,9 @@ public class Main {
         sendRandomMessage(config.getReportMessages());
     }
 
-    private static void sleep(int seconds) {
+    private static void sleepOneSecond() {
         try {
-            TimeUnit.SECONDS.sleep(seconds);
+            TimeUnit.SECONDS.sleep(1);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -124,9 +127,10 @@ public class Main {
     private static void performFinalCleanup() {
         try {
             File lockFile = new File(LOCK_FILE);
-            if (lockFile.exists()) {
-                lockFile.delete();
+            if (lockFile.exists() && !lockFile.delete()) {
+                System.err.println("⚠ Не удалось удалить lock-файл: " + lockFile.getAbsolutePath());
             }
+
             CloseProcess.closeAll();
             System.out.println("✅ Очистка завершена");
         } catch (Exception e) {
@@ -137,20 +141,24 @@ public class Main {
     private static boolean acquireLock() {
         try {
             File lockFile = new File(LOCK_FILE);
-            FileChannel channel = new RandomAccessFile(lockFile, "rw").getChannel();
+            RandomAccessFile raf = new RandomAccessFile(lockFile, "rw");
+            FileChannel channel = raf.getChannel();
             FileLock lock = channel.tryLock();
 
             if (lock == null) {
                 channel.close();
+                raf.close();
                 return false;
             }
 
-            // hook для очистки при выходе
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
                     lock.release();
                     channel.close();
-                    lockFile.delete();
+                    raf.close();
+                    if (!lockFile.delete()) {
+                        System.err.println("⚠ Не удалось удалить lock-файл при завершении");
+                    }
                 } catch (IOException ignored) {
                 }
             }));
@@ -161,12 +169,16 @@ public class Main {
         }
     }
 
+
     public static void completeSU() {
+        Utils.ConfigJson.setWeeklyFarming(false);
+
         TelegramBotSender.sendLocalPhoto("bot_sources/SU.png");
         TelegramBotSender.sendText("Исследование Виртуальной вселенной завершено");
 
         config.setMonitoringEnabled(false);
         ConfigManager.saveConfig(config);
+        performEmergencyShutdown();
     }
 
     public static boolean isRunning() {

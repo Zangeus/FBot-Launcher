@@ -15,14 +15,7 @@ public class Launcher {
             });
         } else {
             LauncherConfig config = ConfigManager.loadConfig();
-            startMainApplication(config, args);
-        }
-    }
-
-    private static void startMainApplication(LauncherConfig config, String[] args) {
-
-        if (!config.isMonitoringEnabled())
             Main.start();
-        else Main.start(999);
+        }
     }
 }

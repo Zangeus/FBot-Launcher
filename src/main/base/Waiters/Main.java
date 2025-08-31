@@ -76,7 +76,7 @@ public class Main {
                 if (maxAttempts < 50) {
                     if (config.isSuccessNotification()) sendRandomMessage(config.getSuccessMessages());
                     performEmergencyShutdown();
-                } else sendPhotoOf_SU();
+                } else completeSU();
             } else {
                 if (config.isFailureNotification()) sendRandomMessage(config.getFailureMessages());
                 performEmergencyShutdown();
@@ -161,9 +161,12 @@ public class Main {
         }
     }
 
-    public static void sendPhotoOf_SU() {
+    public static void completeSU() {
         TelegramBotSender.sendLocalPhoto("bot_sources/SU.png");
         TelegramBotSender.sendText("Исследование Виртуальной вселенной завершено");
+
+        config.setMonitoringEnabled(false);
+        ConfigManager.saveConfig(config);
     }
 
     public static boolean isRunning() {

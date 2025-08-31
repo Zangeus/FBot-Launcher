@@ -2,273 +2,203 @@ package Waiters;
 
 import Config.ConfigManager;
 import Config.LauncherConfig;
-import Utils.Extractor;
 
 import java.io.*;
-import java.net.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class TelegramBotSender {
+    private static final String API_URL = "https://api.telegram.org/bot";
     private static final LauncherConfig config = ConfigManager.loadConfig();
     private static final Random random = new Random();
-    private static final String API_URL = "https://api.telegram.org/bot";
 
-    public static void sendMessages(List<String> messages) {
-        if (!validateConfig()) return;
+    // Пул потоков для асинхронных задач
+    private static final ExecutorService executor = Executors.newCachedThreadPool();
 
-        String message = getRandomMessage(messages);
-        if (isInvalidMessage(message)) {
-            System.out.println("Пустое сообщение - отправка отменена");
-            return;
-        }
-
-        sendRequest("sendMessage", "text", message);
+    // -----------------------
+    // Асинхронная отправка
+    // -----------------------
+    public static void sendAsync(Object content, String captionOrExtra) {
+        executor.submit(() -> send(content, captionOrExtra));
     }
 
-    private static boolean validateConfig() {
-        if (config.getBotToken() == null || config.getBotToken().isEmpty()) {
-            System.err.println("Токен бота не настроен!");
-            return false;
+    // -----------------------
+    // Универсальный метод отправки (синхронный)
+    // -----------------------
+    public static void send(Object content, String captionOrExtra) {
+        if (validateConfig()) return;
+
+        try {
+            if (content instanceof String) {
+                String text = (String) content;
+                sendTextInternal(text + (captionOrExtra != null ? ("\n" + captionOrExtra) : ""));
+            } else if (content instanceof byte[]) {
+                byte[] bytes = (byte[]) content;
+                sendMultipart("sendPhoto", "photo", bytes, "image.png", "image/png", captionOrExtra);
+            } else if (content instanceof File) {
+                File file = (File) content;
+                if (!file.exists()) {
+                    System.err.println("Файл не найден: " + file.getAbsolutePath());
+                    return;
+                }
+                byte[] fileBytes = Files.readAllBytes(file.toPath());
+                String mime = Files.probeContentType(file.toPath());
+                if (mime == null) mime = "application/octet-stream";
+                String method = file.getName().matches("(?i).+\\.(png|jpg|jpeg|gif)$") ? "sendPhoto" : "sendDocument";
+                String fieldName = method.equals("sendPhoto") ? "photo" : "document";
+                sendMultipart(method, fieldName, fileBytes, file.getName(), mime, captionOrExtra);
+            } else if (content instanceof List) {
+                List<?> list = (List<?>) content;
+                int index = 1;
+                for (Object item : list) {
+                    String caption = (captionOrExtra != null ? captionOrExtra + " (" + index + ")" : null);
+                    send(item, caption);
+                    index++;
+                }
+            } else {
+                System.err.println("Неподдерживаемый тип: " + content.getClass());
+            }
+        } catch (IOException e) {
+            System.err.println("Ошибка отправки: " + e.getMessage());
+        }
+    }
+
+    // -----------------------
+    // Упрощённые обёртки
+    // -----------------------
+    public static void sendText(String text) {
+        send(text, null);
+    }
+
+    public static void sendPhoto(byte[] imageBytes, String caption) {
+        send(imageBytes, caption);
+    }
+
+    public static void sendDocument(File file) {
+        send(file, null);
+    }
+
+    public static void sendLocalPhoto(String path) {
+        try {
+            byte[] bytes = Files.readAllBytes(Path.of(path));
+            send(bytes, null);
+        } catch (IOException e) {
+            System.err.println("Не удалось прочитать фото: " + e.getMessage());
+        }
+    }
+
+    // -----------------------
+    // Внутренние реализации
+    // -----------------------
+    private static void sendTextInternal(String text) throws IOException {
+        String urlString = API_URL + config.getBotToken() + "/sendMessage";
+        String data = "chat_id=" + URLEncoder.encode(config.getChatId(), StandardCharsets.UTF_8)
+                + "&text=" + URLEncoder.encode(text, StandardCharsets.UTF_8);
+
+        HttpURLConnection conn = (HttpURLConnection) new URL(urlString).openConnection();
+        conn.setRequestMethod("POST");
+        conn.setDoOutput(true);
+
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(data.getBytes(StandardCharsets.UTF_8));
         }
 
-        if (config.getChatId() == null || config.getChatId().isEmpty()) {
-            System.err.println("Chat ID не настроен!");
-            return false;
+        handleResponse(conn);
+    }
+
+    private static void sendMultipart(String method, String fieldName, byte[] fileBytes,
+                                      String fileName, String mimeType, String caption) throws IOException {
+        String urlString = API_URL + config.getBotToken() + "/" + method;
+        String boundary = "Boundary-" + System.currentTimeMillis();
+
+        HttpURLConnection conn = (HttpURLConnection) new URL(urlString).openConnection();
+        conn.setRequestMethod("POST");
+        conn.setDoOutput(true);
+        conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+        try (OutputStream os = conn.getOutputStream();
+             PrintWriter writer = new PrintWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8), true)) {
+
+            // chat_id
+            writer.append("--").append(boundary).append("\r\n")
+                    .append("Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n")
+                    .append(config.getChatId()).append("\r\n");
+
+            // caption
+            if (caption != null && !caption.isEmpty()) {
+                writer.append("--").append(boundary).append("\r\n")
+                        .append("Content-Disposition: form-data; name=\"caption\"\r\n\r\n")
+                        .append(caption).append("\r\n");
+            }
+
+            // сам файл
+            writer.append("--").append(boundary).append("\r\n")
+                    .append("Content-Disposition: form-data; name=\"").append(fieldName)
+                    .append("\"; filename=\"").append(fileName).append("\"\r\n")
+                    .append("Content-Type: ").append(mimeType).append("\r\n\r\n").flush();
+
+            os.write(fileBytes);
+            os.flush();
+
+            writer.append("\r\n--").append(boundary).append("--\r\n").flush();
         }
 
-        return true;
+        handleResponse(conn);
+    }
+
+    // -----------------------
+    // Случайное сообщение
+    // -----------------------
+    public static void sendRandomMessage(List<String> messages, String extra) {
+        String baseMessage = getRandomMessage(messages);
+        if (isInvalidMessage(baseMessage)) return;
+        send(baseMessage, extra);
     }
 
     private static String getRandomMessage(List<String> messages) {
         if (messages == null || messages.isEmpty()) {
-            return config.isDebugMode()
-                    ? "Нет доступных сообщений в конфигурации"
-                    : "";
+            return config.isDebugMode() ? "Нет доступных сообщений в конфигурации" : "";
         }
         return messages.get(random.nextInt(messages.size()));
     }
 
     private static boolean isInvalidMessage(String message) {
-        return message == null || message.isEmpty() || message.equals("Нет доступных сообщений");
+        return message == null || message.isEmpty()
+                || message.equals("Нет доступных сообщений в конфигурации");
     }
 
-    private static void sendRequest(String method, String paramType, String content) {
-        try {
-            String urlString = API_URL + config.getBotToken() + "/" + method;
-            String postData = String.format(
-                    "chat_id=%s&%s=%s",
-                    URLEncoder.encode(config.getChatId(), StandardCharsets.UTF_8),
-                    paramType,
-                    URLEncoder.encode(content, StandardCharsets.UTF_8)
-            );
-
-            HttpURLConnection connection = createConnection(urlString);
-            sendPostData(connection, postData);
-            handleResponse(connection);
-        } catch (Exception e) {
-            System.err.println("Ошибка отправки сообщения: " + e.getMessage());
+    private static boolean validateConfig() {
+        if (config.getBotToken() == null || config.getChatId() == null) {
+            System.err.println("Ошибка: не указан токен или chatId");
+            return true;
         }
+        return false;
     }
 
-    private static HttpURLConnection createConnection(String urlString) throws IOException {
-        URL url = new URL(urlString);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("POST");
-        connection.setDoOutput(true);
-        connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-        return connection;
-    }
-
-    private static void sendPostData(HttpURLConnection connection, String postData) throws IOException {
-        try (OutputStream os = connection.getOutputStream()) {
-            byte[] input = postData.getBytes(StandardCharsets.UTF_8);
-            os.write(input, 0, input.length);
-        }
-    }
-
-    private static void handleResponse(HttpURLConnection connection) throws IOException {
-        int responseCode = connection.getResponseCode();
-        if (responseCode != HttpURLConnection.HTTP_OK) {
-            System.err.println("Ошибка Telegram API. Код: " + responseCode);
-            readErrorResponse(connection);
-        }
-        connection.disconnect();
-    }
-
-    private static void readErrorResponse(HttpURLConnection connection) {
-        try (BufferedReader br = new BufferedReader(
-                new InputStreamReader(connection.getErrorStream(), StandardCharsets.UTF_8)
-        )) {
-            StringBuilder response = new StringBuilder();
-            String responseLine;
-            while ((responseLine = br.readLine()) != null) {
-                response.append(responseLine.trim());
-            }
-            System.err.println("Ответ сервера: " + response);
-        } catch (IOException e) {
-            System.err.println("Ошибка чтения ответа об ошибке: " + e.getMessage());
-        }
-    }
-
-    // Метод для прямой отправки фото (используется в Extractor)
-    public static void sendPhoto(byte[] imageBytes, String caption) {
-        if (!config.shouldSendFailureReport()) return;
-
-        try {
-            Extractor.sendPhotoWithCaption(
-                    imageBytes,
-                    caption,
-                    config.getBotToken(),
-                    config.getChatId()
-            );
-        } catch (Exception e) {
-            System.err.println("Ошибка отправки фото: " + e.getMessage());
-        }
-    }
-
-    public static void sendExtraMessage(List<String> messages, String extraMessage) {
-        if (!validateConfig()) return;
-
-        String message = getRandomMessage(messages);
-        if (isInvalidMessage(message)) {
-            System.out.println("Пустое сообщение - отправка отменена");
-            return;
-        }
-        sendRequest("sendMessage", "text", message + "\nПримечание: " + extraMessage);
-    }
-
-    public static void sendNoteMessage(String extraMessage) {
-        if (!validateConfig()) return;
-
-        sendRequest("sendMessage", "text", "Примечание: " + extraMessage);
-    }
-
-    public static void sendPhotoUrl(String imageUrl) {
-        if (!validateConfig()) return;
-        sendRequest("sendPhoto", "photo", imageUrl);
-    }
-
-    public static void sendLocalPhoto(String imagePath) {
-        if (!validateConfig()) return;
-
-        try {
-            File imageFile = new File(imagePath);
-
-            // Исправление: получаем Path из File
-            Path filePath = imageFile.toPath();
-            byte[] imageBytes = Files.readAllBytes(filePath);
-
-            String urlString = API_URL + config.getBotToken() + "/sendPhoto";
-            HttpURLConnection connection = (HttpURLConnection) new URL(urlString).openConnection();
-
-            // Формируем multipart-запрос
-            String boundary = "Boundary-" + System.currentTimeMillis();
-            connection.setRequestMethod("POST");
-            connection.setDoOutput(true);
-            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
-
-            try (OutputStream os = connection.getOutputStream();
-                 PrintWriter writer = new PrintWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8))) {
-
-                // Параметр chat_id
-                writer.append("--").append(boundary).append("\r\n");
-                writer.append("Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n");
-                writer.append(config.getChatId()).append("\r\n").flush();
-
-                // Файл с изображением
-                writer.append("--").append(boundary).append("\r\n");
-                writer.append("Content-Disposition: form-data; name=\"photo\"; filename=\"")
-                        .append(imageFile.getName()).append("\"\r\n");
-                writer.append("Content-Type: image/png\r\n\r\n").flush();
-                os.write(imageBytes);
-                os.flush();
-
-                // Завершаем boundary
-                writer.append("\r\n--").append(boundary).append("--\r\n").flush();
-            }
-
-            handleResponse(connection);
-        } catch (IOException e) {
-            System.err.println("Ошибка отправки локального фото: " + e.getMessage());
-        }
-    }
-
-    public static void sendPhotos(List<byte[]> photos, String message) {
-        if (!validateConfig() || photos == null || photos.isEmpty()) return;
-
-        try {
-            String urlString = API_URL + config.getBotToken() + "/sendMediaGroup";
-            String boundary = "Boundary-" + System.currentTimeMillis();
-
-            HttpURLConnection connection = (HttpURLConnection) new URL(urlString).openConnection();
-            connection.setRequestMethod("POST");
-            connection.setDoOutput(true);
-            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
-
-            try (OutputStream os = connection.getOutputStream();
-                 PrintWriter writer = new PrintWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8))) {
-
-                // Добавляем chat_id
-                writer.append("--").append(boundary).append("\r\n");
-                writer.append("Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n");
-                writer.append(config.getChatId()).append("\r\n");
-
-                // Формируем JSON для медиагруппы
-                writer.append("--").append(boundary).append("\r\n");
-                writer.append("Content-Disposition: form-data; name=\"media\"\r\n");
-                writer.append("Content-Type: application/json\r\n\r\n");
-
-                writer.append("[");
-                for (int i = 0; i < photos.size(); i++) {
-                    if (i > 0) writer.append(",");
-                    writer.append(String.format(
-                            "{\"type\":\"photo\",\"media\":\"attach://file%d\"}",
-                            i
-                    ));
+    private static void handleResponse(HttpURLConnection conn) throws IOException {
+        int code = conn.getResponseCode();
+        if (code != 200) {
+            try (InputStream err = conn.getErrorStream()) {
+                if (err != null) {
+                    String errorMsg = new String(err.readAllBytes(), StandardCharsets.UTF_8);
+                    System.err.println("Ошибка ответа Telegram API: " + errorMsg);
                 }
-                writer.append("]\r\n");
-
-                // Добавляем файлы изображений
-                for (int i = 0; i < photos.size(); i++) {
-                    writer.append("--").append(boundary).append("\r\n");
-                    writer.append(String.format(
-                            "Content-Disposition: form-data; name=\"file%d\"; filename=\"screenshot%d.png\"\r\n",
-                            i, i
-                    ));
-                    writer.append("Content-Type: image/png\r\n\r\n");
-                    writer.flush();
-
-                    os.write(photos.get(i));
-                    os.flush();
-
-                    writer.append("\r\n");
-                }
-
-                // Завершаем запрос
-                writer.append("--").append(boundary).append("--\r\n");
-                writer.flush();
             }
-
-            // Обрабатываем ответ
-            int responseCode = connection.getResponseCode();
-            if (responseCode != HttpURLConnection.HTTP_OK) {
-                System.err.println("Ошибка отправки медиагруппы. Код: " + responseCode);
-                readErrorResponse(connection);
-            }
-
-            // Отправляем текстовое сообщение отдельно
-            if (message != null && !message.isEmpty()) {
-                sendRequest("sendMessage", "text", message);
-            }
-
-            connection.disconnect();
-        } catch (Exception e) {
-            System.err.println("Ошибка отправки медиагруппы: " + e.getMessage());
-            e.printStackTrace();
         }
+    }
+
+    // -----------------------
+    // Завершение пула потоков
+    // -----------------------
+    public static void shutdown() {
+        executor.shutdown();
     }
 }

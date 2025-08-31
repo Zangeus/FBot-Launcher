@@ -4,6 +4,7 @@ import Config.ConfigManager;
 import Config.LauncherConfig;
 import End.CloseProcess;
 import Start.StartIsHere;
+import Utils.ClickByCoords;
 
 import java.awt.*;
 import java.io.BufferedReader;
@@ -12,7 +13,6 @@ import java.io.InputStreamReader;
 import java.util.concurrent.TimeUnit;
 
 import static Utils.ClickByCoords.activateAndClick;
-import static Utils.ClickByCoords.activateWindow;
 import static Utils.ClickByCoords.performClick;
 import static Utils.FindButtonAndPress.*;
 
@@ -38,7 +38,7 @@ public class Monitoring {
     public static void monitorStart() {
 
         while (true) {
-            activateWindow(src);
+            ClickByCoords.focusWindow(src);
             if (find(SU_FAIL)) {
                 reenterIntoSU();
                 sleep(20, MINUTES);
@@ -83,14 +83,14 @@ public class Monitoring {
             sleep(30, SECONDS);
 
             if (find(START_FAILED)) {
-                CloseProcess.terminateProcesses();
+                CloseProcess.closeAll();
             } else break;
         }
         sleep(config.getSleepDurationMinutes(), MINUTES);
     }
 
     private static void executeEmergencyProtocol() {
-        CloseProcess.terminateProcesses();
+        CloseProcess.closeAll();
         performEmergencyShutdown();
     }
 
@@ -98,7 +98,7 @@ public class Monitoring {
         String imagePath = "bot_sources/SU.png";
         TelegramBotSender.sendLocalPhoto(imagePath);
 
-        TelegramBotSender.sendNoteMessage("Исследование Виртуальной вселенной завершено");
+        TelegramBotSender.sendText("Исследование Виртуальной вселенной завершено");
     }
 
 
@@ -107,7 +107,7 @@ public class Monitoring {
         sleep(3, "SECONDS");
         performClick(780, 675, 0);
 
-        activateWindow(src);
+        ClickByCoords.focusWindow(src);
         findAndClickWithOneMessage("start_button.png", "Не удалось найти кнопку запуска");
     }
 
@@ -136,7 +136,7 @@ public class Monitoring {
     }
 
     private static void restart() {
-        CloseProcess.terminateProcesses();
+        CloseProcess.closeAll();
         startBot();
     }
 

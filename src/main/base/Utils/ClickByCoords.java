@@ -20,7 +20,7 @@ public class ClickByCoords {
         }
     }
 
-    public static boolean activateWindow(String WINDOW_TITLE) {
+    public static boolean focusWindow(String WINDOW_TITLE) {
         final int MAX_ATTEMPTS = 3;
         for (int i = 0; i < MAX_ATTEMPTS; i++) {
             WinDef.HWND hwnd = User32.INSTANCE.FindWindow(null, WINDOW_TITLE);
@@ -58,7 +58,7 @@ public class ClickByCoords {
     public static void activateAndClick(String WINDOW_TITLE
             , Point[] CLICK_POINTS, int DELAY_MS) {
         try {
-            if (!activateWindow(WINDOW_TITLE)) return;
+            if (!focusWindow(WINDOW_TITLE)) return;
             sleep(DELAY_MS);
 
             for (Point p : CLICK_POINTS) {

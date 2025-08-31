@@ -5,21 +5,26 @@ import Config.LauncherConfig;
 import End.CloseProcess;
 import End.EndIsNear;
 import Start.StartIsHere;
+import Utils.ErrorMonitoring;
 
 import java.io.*;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import static Utils.ClickByCoords.activateWindow;
 import static Utils.FindButtonAndPress.findAndClickScreenless;
 
 public class Main {
     private static final String LOCK_FILE = "bot_sources/app.lock";
     private static final LauncherConfig config = ConfigManager.loadConfig();
-    public static volatile boolean isRunning = true;
+    private static volatile boolean isRunning = true;
     private static boolean done = false;
+    private static final int maxAttempts = 3;
+    private static final int timeoutSeconds = 30;
 
     public static void main(String[] args) {
         if (!acquireLock()) {
@@ -29,24 +34,18 @@ public class Main {
         isRunning = true;
 
         try {
-            final int maxAttempts = 3;
-
             for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-
-                System.out.println("\nУбираем окна, чтобы не отслеживать ошибки");
-                CloseProcess.terminateProcesses();
+                CloseProcess.closeAll();
 
                 System.out.println("\n=== Попытка #" + attempt + " ===");
                 if (!StartIsHere.start()) continue;
 
-                System.out.println("Ждем 30 секунд перед проверкой на ошибки лога");
-
-                sleep(30);
-                activateWindow("src");
-                if (findAndClickScreenless("critical_2.png")) {
+                // --- Новый блок вместо findAndClickScreenless ---
+                if (waitForError()) {  // ждём 30 секунд ошибку
                     restart();
                     continue;
                 }
+                // -------------------------------------------------
 
                 sleep(config.getSleepDurationMinutes() * 60);
 
@@ -68,14 +67,26 @@ public class Main {
         }
     }
 
+    private static boolean waitForError() {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Future<Boolean> future = executor.submit(() -> ErrorMonitoring.waitForSingleError(timeoutSeconds));
+        try {
+            return future.get(timeoutSeconds + 5, TimeUnit.SECONDS); // с запасом
+        } catch (Exception e) {
+            return false;
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     private static void restart() {
-        CloseProcess.terminateProcesses();
+        CloseProcess.closeAll();
         sendMessages(config.getReportMessages());
     }
 
     private static void sendMessages(List<String> messages) {
         if (messages != null && !messages.isEmpty()) {
-            TelegramBotSender.sendMessages(messages);
+            TelegramBotSender.sendRandomMessage(messages, null);
         } else {
             System.err.println("Список сообщений пуст, отправка отменена");
         }
@@ -105,7 +116,7 @@ public class Main {
                 lockFile.delete();
             }
 
-            CloseProcess.terminateProcesses();
+            CloseProcess.closeAll();
             performEmergencyShutdown();
         } catch (Exception e) {
             System.err.println("Ошибка при последней зачистке: " + e.getMessage());

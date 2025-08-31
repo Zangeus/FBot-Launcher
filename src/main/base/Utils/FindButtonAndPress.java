@@ -3,9 +3,8 @@ package Utils;
 import Config.ConfigManager;
 import Config.LauncherConfig;
 import Waiters.TelegramBotSender;
-import com.sun.jna.platform.win32.User32;
-import com.sun.jna.platform.win32.WinDef;
-import com.sun.jna.platform.win32.WinUser;
+import com.sun.jna.Native;
+import com.sun.jna.platform.win32.*;
 import org.opencv.core.*;
 import org.opencv.core.Point;
 import org.opencv.imgcodecs.Imgcodecs;
@@ -59,7 +58,6 @@ public class FindButtonAndPress {
 
             Core.MinMaxLocResult mmr = Core.minMaxLoc(result);
             if (mmr.maxVal > MATCH_THRESHOLD) {
-                // Корректируем координаты на центр кнопки
                 int x = (int) (mmr.maxLoc.x + buttonImage.cols() / 2.0);
                 int y = (int) (mmr.maxLoc.y + buttonImage.rows() / 2.0);
                 return new Point(x, y);
@@ -77,27 +75,22 @@ public class FindButtonAndPress {
     }
 
     private static Mat convertToMat(BufferedImage image) {
-        // Конвертируем в правильный формат если нужно
         if (image.getType() != BufferedImage.TYPE_3BYTE_BGR) {
             BufferedImage converted = new BufferedImage(
                     image.getWidth(),
                     image.getHeight(),
                     BufferedImage.TYPE_3BYTE_BGR
             );
-            converted.getGraphics().drawImage(image, 0, 0, null);
+            Graphics g = converted.getGraphics();
+            g.drawImage(image, 0, 0, null);
+            g.dispose();
             image = converted;
         }
 
-        // Получаем данные изображения
         byte[] pixels = ((DataBufferByte) image.getRaster().getDataBuffer()).getData();
 
-        // Создаем Mat и заполняем данными
-        Mat mat = new Mat(
-                image.getHeight(),
-                image.getWidth(),
-                CvType.CV_8UC3
-        );
-        mat.put(0, 0, pixels); // Возвращаем Mat, а не результат put()
+        Mat mat = new Mat(image.getHeight(), image.getWidth(), CvType.CV_8UC3);
+        mat.put(0, 0, pixels);
 
         return mat;
     }
@@ -124,68 +117,124 @@ public class FindButtonAndPress {
     private static void handleFailure() {
         if (config.isFailureNotification() && config.isNotificationsEnabled()) {
             try {
-                List<byte[]> screenshots = new ArrayList<>();
                 StringBuilder message = new StringBuilder("Ошибка в работе приложения! Состояние окон:\n");
 
-                // Проверяем и обрабатываем окно приложения "src"
-                WinDef.HWND appHwnd = User32.INSTANCE.FindWindow(null, "src");
-                if (appHwnd != null && User32.INSTANCE.IsWindowVisible(appHwnd)) {
-                    focusWindow(appHwnd);
-                    screenshots.add(captureWindowScreenshot(appHwnd));
+                List<WinDef.HWND> srcWindows = findWindowsByTitlePart("SRC");
+                if (!srcWindows.isEmpty()) {
                     message.append("- Приложение 'src' активно\n");
+                    for (WinDef.HWND hwnd : srcWindows) {
+                        focusWindow(hwnd);
+                        byte[] screenshot = captureWindowScreenshot(hwnd);
+                        TelegramBotSender.sendPhoto(screenshot, "Скриншот окна: src");
+                    }
                 } else {
                     message.append("- Приложение 'src' не активно\n");
                 }
 
-                // Проверяем и обрабатываем окно эмулятора "MuMu Player 12"
-                WinDef.HWND emulatorHwnd = User32.INSTANCE.FindWindow(null, "MuMu Player 12");
-                if (emulatorHwnd != null && User32.INSTANCE.IsWindowVisible(emulatorHwnd)) {
-                    focusWindow(emulatorHwnd);
-                    screenshots.add(captureWindowScreenshot(emulatorHwnd));
-                    message.append("- Эмулятор 'MuMu Player 12' активен\n");
+                List<WinDef.HWND> emulatorWindows = findWindowsByTitlePart("Android Device");
+                if (emulatorWindows.isEmpty()) {
+                    emulatorWindows = findWindowsByTitlePart("MuMu");
+                }
+
+                if (!emulatorWindows.isEmpty()) {
+                    message.append("- Эмулятор активен\n");
+                    for (WinDef.HWND hwnd : emulatorWindows) {
+                        focusWindow(hwnd);
+                        byte[] screenshot = captureWindowScreenshot(hwnd);
+                        TelegramBotSender.sendPhoto(screenshot, "Скриншот окна: эмулятор");
+                    }
                 } else {
-                    message.append("- Эмулятор 'MuMu Player 12' не активен\n");
+                    message.append("- Эмулятор не активен\n");
                 }
 
-                // Если оба окна не найдены, делаем скриншот всего экрана
-                if (screenshots.isEmpty()) {
-                    screenshots.add(Extractor.captureScreenshot());
-                    message.append("\nНи одно из целевых окон не найдено. Скриншот всего экрана.");
+                // Если ничего не нашли — общий скрин
+                if (srcWindows.isEmpty() && emulatorWindows.isEmpty()) {
+                    byte[] screenshot = Extractor.captureScreenshot();
+                    TelegramBotSender.sendPhoto(screenshot, "Ни одно окно не найдено. Скриншот всего экрана.");
                 }
 
-                TelegramBotSender.sendPhotos(screenshots, message.toString());
+                // Итоговое текстовое сообщение
+                TelegramBotSender.sendText(message.toString());
 
             } catch (Exception e) {
                 System.err.println("Ошибка обработки сбоя: " + e.getMessage());
-                TelegramBotSender.sendMessages(List.of("Ошибка! Не удалось обработать сбой"));
+                TelegramBotSender.sendText("Ошибка! Не удалось обработать сбой");
             }
         }
+    }
+
+    private static List<WinDef.HWND> findWindowsByTitlePart(String part) {
+        List<WinDef.HWND> result = new ArrayList<>();
+        User32.INSTANCE.EnumWindows((hwnd, data) -> {
+            char[] windowText = new char[512];
+            User32.INSTANCE.GetWindowText(hwnd, windowText, 512);
+            String title = Native.toString(windowText);
+
+            if (title.contains(part) && User32.INSTANCE.IsWindowVisible(hwnd)) {
+                result.add(hwnd);
+            }
+            return true;
+        }, null);
+        return result;
     }
 
     private static void focusWindow(WinDef.HWND hwnd) {
         if (User32.INSTANCE.GetForegroundWindow() != hwnd) {
             User32.INSTANCE.ShowWindow(hwnd, WinUser.SW_RESTORE);
             User32.INSTANCE.SetForegroundWindow(hwnd);
-            robot.delay(500); // Даем время для фокусировки
+            robot.delay(500);
         }
     }
 
     private static byte[] captureWindowScreenshot(WinDef.HWND hwnd) {
         WinDef.RECT rect = new WinDef.RECT();
         User32.INSTANCE.GetWindowRect(hwnd, rect);
+        int width = rect.right - rect.left;
+        int height = rect.bottom - rect.top;
 
-        Rectangle area = new Rectangle(
-                rect.left,
-                rect.top,
-                rect.right - rect.left,
-                rect.bottom - rect.top
-        );
+        // DC окна
+        WinDef.HDC windowDC = User32.INSTANCE.GetDC(hwnd);
+        WinDef.HDC memDC = GDI32.INSTANCE.CreateCompatibleDC(windowDC);
+        WinDef.HBITMAP outputBitmap = GDI32.INSTANCE.CreateCompatibleBitmap(windowDC, width, height);
 
-        BufferedImage image = robot.createScreenCapture(area);
+        WinNT.HANDLE oldBitmap = GDI32.INSTANCE.SelectObject(memDC, outputBitmap);
+
+        // ⚡ рисуем окно в наш DC
+        User32.INSTANCE.PrintWindow(hwnd, memDC, 0);
+
+        // Настройка BITMAPINFO
+        WinGDI.BITMAPINFO bmi = new WinGDI.BITMAPINFO();
+        bmi.bmiHeader.biSize = bmi.bmiHeader.size();
+        bmi.bmiHeader.biWidth = width;
+        bmi.bmiHeader.biHeight = -height; // отрицательный => без переворота
+        bmi.bmiHeader.biPlanes = 1;
+        bmi.bmiHeader.biBitCount = 32;
+        bmi.bmiHeader.biCompression = WinGDI.BI_RGB;
+
+        // Буфер под пиксели
+        int bufferSize = width * height * 4; // 4 байта на пиксель (ARGB)
+        com.sun.jna.Memory buffer = new com.sun.jna.Memory(bufferSize);
+
+        // Считываем данные
+        GDI32.INSTANCE.GetDIBits(memDC, outputBitmap, 0, height, buffer, bmi, WinGDI.DIB_RGB_COLORS);
+
+        // Перегоняем в int[]
+        int[] pixels = buffer.getIntArray(0, width * height);
+
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        image.setRGB(0, 0, width, height, pixels, 0, width);
+
+        // Чистим за собой
+        GDI32.INSTANCE.SelectObject(memDC, oldBitmap);
+        GDI32.INSTANCE.DeleteObject(outputBitmap);
+        GDI32.INSTANCE.DeleteDC(memDC);
+        User32.INSTANCE.ReleaseDC(hwnd, windowDC);
+
         return convertToByteArray(image);
     }
 
-    // Конвертация BufferedImage в byte[]
+
+
     private static byte[] convertToByteArray(BufferedImage image) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             ImageIO.write(image, "png", baos);
@@ -233,76 +282,13 @@ public class FindButtonAndPress {
         return false;
     }
 
-    public static boolean findAndClickWithMessage(String image, String message) {
-        boolean result = findAndClick(image);
-
-        if (!result)
-            if (config.isFailureNotification())
-                TelegramBotSender.sendExtraMessage(config.getReportMessages(), message);
-
-        return result;
-    }
-
-    public static boolean findAndClickForTasks(String image) {
-        boolean result = findAndClick(image);
-
-        if (!result)
-            if (config.isFailureNotification())
-                TelegramBotSender.sendMessages(config.getReportMessages());
-
-        return result;
-    }
-
     public static boolean findAndClickWithOneMessage(String image, String message) {
         boolean result = findAndClick(image);
 
         if (!result)
             if (config.isFailureNotification())
-                TelegramBotSender.sendNoteMessage(message);
+                TelegramBotSender.sendText(message);
 
         return result;
     }
-
-    public static boolean findAndClickWithDelay(String image, int delayMs) {
-        boolean result = findAndClick(image);
-        if (result)
-            try {
-                Thread.sleep(delayMs);
-            } catch (InterruptedException e) {
-                System.out.println(e.getMessage());
-            }
-        return result;
-    }
-
-    public static boolean findAndClickWithOneMessageAndDelay(String image, String message, int delayMs) {
-        boolean result = findAndClick(image);
-
-        if (result)
-            try {
-                Thread.sleep(delayMs);
-            } catch (InterruptedException e) {
-                System.out.println(e.getMessage());
-            }
-        else if (config.isFailureNotification())
-            TelegramBotSender.sendNoteMessage(message);
-
-        return result;
-    }
-
-    public static boolean findAndClickWithMessageAndDelay(String image, String message, int delayMs) {
-        boolean result = findAndClick(image);
-
-        if (result)
-            try {
-                Thread.sleep(delayMs);
-            } catch (InterruptedException e) {
-                System.out.println(e.getMessage());
-            }
-        else if (config.isFailureNotification())
-            TelegramBotSender.sendExtraMessage(config.getReportMessages(), message);
-
-        return result;
-    }
-
-
 }

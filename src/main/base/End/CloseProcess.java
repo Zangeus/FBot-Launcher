@@ -1,36 +1,30 @@
 package End;
 
-import java.io.IOException;
+import com.sun.jna.platform.win32.User32;
+import com.sun.jna.platform.win32.WinDef.HWND;
 
 public class CloseProcess {
-    private static final String[] processes = new String[]{"MuMuVMMHeadless.exe", "MuMuPlayer.exe", "src" };
+    private static final String[] windowTitles = new String[]{
+            "Android Device",
+            "MuMuPlayer",
+            "src"
+    };
 
-    public static void terminate(String processName) {
-        try {
-            ProcessBuilder processBuilder = new ProcessBuilder("tasklist");
-            Process process = processBuilder.start();
+    public static void closeWindow(String windowTitle) {
+        User32 user32 = User32.INSTANCE;
 
-            java.util.Scanner scanner = new java.util.Scanner(process.getInputStream());
-            while (scanner.hasNextLine()) {
-                String line = scanner.nextLine();
-                if (line.contains(processName)) {
-                    String[] parts = line.split("\\s+");
-                    String pid = parts[1];
-
-                    new ProcessBuilder("taskkill", "/PID", pid, "/F").start();
-                    System.out.println("Процесс " + processName + " с PID " + pid + " завершен.");
-                    return;
-                }
-            }
-            scanner.close();
-        } catch (IOException e) {
-            System.out.println(e.getMessage());
+        HWND hwnd = user32.FindWindow(null, windowTitle);
+        if (hwnd != null) {
+            user32.PostMessage(hwnd, 0x10, null, null);
+            System.out.println("Окно \"" + windowTitle + "\" закрывается мягко...");
+        } else {
+            System.out.println("Окно с заголовком \"" + windowTitle + "\" не найдено!");
         }
     }
 
-    public static void terminateProcesses() {
-        for (String processName : processes) {
-            terminate(processName);
+    public static void closeAll() {
+        for (String title : windowTitles) {
+            closeWindow(title);
         }
     }
 }

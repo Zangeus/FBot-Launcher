@@ -6,6 +6,7 @@ import Waiters.TelegramBotSender;
 import org.apache.commons.io.input.Tailer;
 import org.apache.commons.io.input.TailerListenerAdapter;
 
+import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -15,7 +16,10 @@ import java.util.Set;
 import java.util.concurrent.*;
 import java.util.stream.Stream;
 
-import static Waiters.SU_related.reenterIntoSU;
+import static Utils.ClickByCoords.activateAndClick;
+import static Utils.ClickByCoords.performClick;
+import static Utils.FindButtonAndPress.findAndClickWithMessage;
+
 
 public class ErrorMonitoring {
     private static final String ERROR_DIR = "Q:/Z-folder/Bot_time/StarRailCopilot/log/error";
@@ -212,5 +216,26 @@ public class ErrorMonitoring {
                 .get();
 
         tailer.run();
+    }
+
+    private static final String MuMu = "Android Device";
+    private static final String src = "src";
+    private static final Point[] CLICK_POINTS = {
+            new Point(970, 444),
+            new Point(940, 666),
+            new Point(915, 520),
+    };
+
+    private static void reenterIntoSU() {
+        activateAndClick(MuMu, CLICK_POINTS, 3000);
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        performClick(780, 675, 0);
+
+        ClickByCoords.focusWindow(src);
+        findAndClickWithMessage("start_button.png", "Не удалось найти кнопку запуска");
     }
 }

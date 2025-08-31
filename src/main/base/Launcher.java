@@ -2,7 +2,6 @@ import Config.ConfigManager;
 import Config.ConfigWindowStructure.ConfigWindow;
 import Config.LauncherConfig;
 import Waiters.Main;
-//import Waiters.SU_related;
 
 import javax.swing.*;
 

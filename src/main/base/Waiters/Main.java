@@ -8,8 +8,6 @@ import Start.StartIsHere;
 import Utils.ErrorMonitoring;
 
 import java.io.*;
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -138,37 +136,51 @@ public class Main {
         }
     }
 
+
     private static boolean acquireLock() {
         try {
             File lockFile = new File(LOCK_FILE);
-            RandomAccessFile raf = new RandomAccessFile(lockFile, "rw");
-            FileChannel channel = raf.getChannel();
-            FileLock lock = channel.tryLock();
 
-            if (lock == null) {
-                channel.close();
-                raf.close();
-                return false;
+            // Если файл уже существует → читаем PID
+            if (lockFile.exists()) {
+                try (BufferedReader br = new BufferedReader(new FileReader(lockFile))) {
+                    String pidStr = br.readLine();
+                    if (pidStr != null) {
+                        long pid = Long.parseLong(pidStr.trim());
+                        // Проверяем жив ли процесс
+                        if (isProcessRunning(pid)) {
+                            System.err.println("⚠ Программа уже запущена с PID " + pid);
+                            return false;
+                        }
+                    }
+                } catch (Exception ignored) {}
             }
 
+            // Пишем свой PID в lock-файл
+            long currentPid = ProcessHandle.current().pid();
+            try (FileWriter fw = new FileWriter(lockFile, false)) {
+                fw.write(Long.toString(currentPid));
+            }
+
+            // Чистим при завершении
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                try {
-                    lock.release();
-                    channel.close();
-                    raf.close();
+                if (lockFile.exists()) {
                     if (!lockFile.delete()) {
-                        System.err.println("⚠ Не удалось удалить lock-файл при завершении");
+                        System.err.println("⚠ Не удалось удалить lock-файл");
                     }
-                } catch (IOException ignored) {
                 }
             }));
 
             return true;
         } catch (IOException e) {
+            System.err.println("Ошибка acquireLock: " + e.getMessage());
             return false;
         }
     }
 
+    private static boolean isProcessRunning(long pid) {
+        return ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
+    }
 
     public static void completeSU() {
         Utils.ConfigJson.setWeeklyFarming(false);

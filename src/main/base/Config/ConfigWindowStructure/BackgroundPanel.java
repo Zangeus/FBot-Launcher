@@ -1,5 +1,7 @@
 package Config.ConfigWindowStructure;
 
+import lombok.Setter;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -12,6 +14,7 @@ public class BackgroundPanel extends JPanel {
     private Color edgeColor = Color.WHITE;
 
     private Point initialClick;
+    @Setter
     private Window window;
 
     public BackgroundPanel(Image backgroundImage, float transparency) {
@@ -21,10 +24,6 @@ public class BackgroundPanel extends JPanel {
         calculateEdgeColor();
 
         addMouseListeners();
-    }
-
-    public void setWindow(Window window) {
-        this.window = window;
     }
 
     private void addMouseListeners() {

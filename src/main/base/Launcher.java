@@ -1,6 +1,4 @@
-import Config.ConfigManager;
 import Config.ConfigWindowStructure.ConfigWindow;
-import Config.LauncherConfig;
 import Waiters.Main;
 
 import javax.swing.*;
@@ -12,9 +10,6 @@ public class Launcher {
                 ConfigWindow window = new ConfigWindow();
                 window.setVisible(true);
             });
-        } else {
-            LauncherConfig config = ConfigManager.loadConfig();
-            Main.start();
-        }
+        } else Main.start();
     }
 }

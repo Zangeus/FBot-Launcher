@@ -2,7 +2,6 @@ package Utils;
 
 import Config.ConfigManager;
 import Config.LauncherConfig;
-import Waiters.TelegramBotSender;
 import org.opencv.core.*;
 import org.opencv.core.Point;
 import org.opencv.imgcodecs.Imgcodecs;
@@ -12,7 +11,6 @@ import java.awt.*;
 import java.awt.event.InputEvent;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
-import java.io.File;
 
 public class FindButtonAndPress {
     private static final LauncherConfig config = ConfigManager.loadConfig();

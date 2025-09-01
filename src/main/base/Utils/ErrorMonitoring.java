@@ -1,7 +1,5 @@
 package Utils;
 
-import Config.ConfigManager;
-import Config.LauncherConfig;
 import Waiters.TelegramBotSender;
 import org.apache.commons.io.input.Tailer;
 import org.apache.commons.io.input.TailerListenerAdapter;
@@ -11,6 +9,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.util.Comparator;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.*;
@@ -24,7 +23,6 @@ import static Utils.FindButtonAndPress.findAndClickWithMessage;
 public class ErrorMonitoring {
     private static final String ERROR_DIR = "Q:/Z-folder/Bot_time/StarRailCopilot/log/error";
     private static final String MAIN_LOG_DIR = "Q:/Z-folder/Bot_time/StarRailCopilot/log";
-    private static final LauncherConfig config = ConfigManager.loadConfig();
     private static final Set<String> reportedErrors = ConcurrentHashMap.newKeySet();
 
     private static ExecutorService executor;
@@ -64,7 +62,7 @@ public class ErrorMonitoring {
             for (WatchEvent<?> event : key.pollEvents()) {
                 Path newPath = dir.resolve((Path) event.context());
                 if (Files.isDirectory(newPath)) {
-                    handleErrorFolder(newPath.toFile(), false); // single → без реэнтера
+                    handleErrorFolder(newPath.toFile(), false);
                     return true;
                 }
             }
@@ -167,7 +165,7 @@ public class ErrorMonitoring {
         try (Stream<Path> files = Files.list(Paths.get(MAIN_LOG_DIR))) {
             return files.filter(p -> p.getFileName().toString().endsWith("_src.txt"))
                     .map(Path::toFile)
-                    .max((f1, f2) -> Long.compare(f1.lastModified(), f2.lastModified()))
+                    .max(Comparator.comparingLong(File::lastModified))
                     .orElse(null);
         }
     }

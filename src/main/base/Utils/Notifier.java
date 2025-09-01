@@ -3,6 +3,11 @@ package Utils;
 import Waiters.TelegramBotSender;
 import com.sun.jna.platform.win32.WinDef;
 
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -58,7 +63,7 @@ public class Notifier {
 
             // --- Если ни одного окна ---
             if (srcWindows.isEmpty() && emulatorWindows.isEmpty()) {
-                byte[] screenshot = Extractor.captureScreenshot();
+                byte[] screenshot = captureScreenshot();
                 TelegramBotSender.sendPhoto(screenshot, "Ни одно окно не найдено. Скриншот всего экрана.");
             }
 
@@ -68,6 +73,17 @@ public class Notifier {
         } catch (Exception e) {
             System.err.println("Ошибка Notifier: " + e.getMessage());
             TelegramBotSender.sendText("Ошибка! Не удалось отправить уведомление о сбое");
+        }
+    }
+
+    public static byte[] captureScreenshot() throws AWTException, IOException {
+        Robot robot = new Robot();
+        Rectangle screenRect = new Rectangle(Toolkit.getDefaultToolkit().getScreenSize());
+        BufferedImage screenshot = robot.createScreenCapture(screenRect);
+
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            ImageIO.write(screenshot, "png", baos);
+            return baos.toByteArray();
         }
     }
 }

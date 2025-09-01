@@ -8,12 +8,6 @@ import static Utils.FindButtonAndPress.*;
 
 public class StartIsHere {
 
-    private static Process startedProcess; // сохраним процесс
-
-    public static void start() {
-        start(1);
-    }
-
     public static boolean start(int attempt) {
         try {
             String processToStart =
@@ -23,7 +17,7 @@ public class StartIsHere {
                     .directory(new File("Q:\\Z-folder\\Bot_time\\StarRailCopilot"))
                     .redirectErrorStream(true);
 
-            startedProcess = pb.start();
+            Process startedProcess = pb.start();
 
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(startedProcess.getInputStream()))) {
@@ -52,10 +46,5 @@ public class StartIsHere {
             System.err.println("Ошибка при запуске приложения: " + e.getMessage());
             return false;
         }
-    }
-
-
-    public static Process getStartedProcess() {
-        return startedProcess;
     }
 }

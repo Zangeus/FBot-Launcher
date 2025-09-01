@@ -1,5 +1,6 @@
 package End;
 
+import lombok.Getter;
 import org.apache.commons.io.input.Tailer;
 import org.apache.commons.io.input.TailerListenerAdapter;
 import org.json.JSONObject;
@@ -11,6 +12,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.util.Comparator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Stream;
@@ -22,11 +24,8 @@ public class EndWatcher {
     private static String lastEventTime = "";
     private static ExecutorService executor;
     private static volatile boolean running = false;
+    @Getter
     private static volatile boolean stoppedSuccessfully = false;
-
-    public static boolean isStoppedSuccessfully() {
-        return stoppedSuccessfully;
-    }
 
     public static synchronized void startAsync() {
         stop();
@@ -41,7 +40,7 @@ public class EndWatcher {
                     logFile = files
                             .filter(p -> p.getFileName().toString().endsWith("_src.txt"))
                             .map(Path::toFile)
-                            .max((f1, f2) -> Long.compare(f1.lastModified(), f2.lastModified()))
+                            .max(Comparator.comparingLong(File::lastModified))
                             .orElseThrow(() -> new RuntimeException("Не найден файл *_src.txt в " + LOG_DIR));
                 }
 

@@ -45,7 +45,6 @@ public class WindowUtils {
         }
     }
 
-
     public static String getWindowTitleByPID(long pid) {
         final StringBuilder windowTitle = new StringBuilder();
 
@@ -68,16 +67,16 @@ public class WindowUtils {
         return windowTitle.toString();
     }
 
-    public static boolean closeWindowByTitle(String windowTitle) {
-        HWND hWnd = User32.INSTANCE.FindWindow(null, windowTitle);
-        if (hWnd == null) {
-            System.err.println("Окно не найдено: " + windowTitle);
-            return false;
-        }
+    public static void closeWindowByTitle(String windowTitle) {
+        User32 user32 = User32.INSTANCE;
 
-        int WM_CLOSE = 0x0010;
-        User32.INSTANCE.PostMessage(hWnd, WM_CLOSE, null, null);
-        return true;
+        HWND hwnd = user32.FindWindow(null, windowTitle);
+        if (hwnd != null) {
+            user32.PostMessage(hwnd, 0x10, null, null);
+            System.out.println("Окно \"" + windowTitle + "\" закрывается мягко...");
+        } else {
+            System.out.println("Окно с заголовком \"" + windowTitle + "\" не найдено!");
+        }
     }
 
     public static byte[] captureWindowScreenshot(WinDef.HWND hwnd) {

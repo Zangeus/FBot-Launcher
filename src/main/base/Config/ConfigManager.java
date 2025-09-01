@@ -23,14 +23,12 @@ public class ConfigManager {
         return new LauncherConfig();
     }
 
-    public static boolean saveConfig(LauncherConfig config) {
+    public static void saveConfig(LauncherConfig config) {
         try {
             mapper.writerWithDefaultPrettyPrinter()
                     .writeValue(new File(CONFIG_FILE), config);
-            return true;
         } catch (IOException e) {
             System.err.println("Ошибка сохранения конфига: " + e.getMessage());
-            return false;
         }
     }
 }

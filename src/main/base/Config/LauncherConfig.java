@@ -20,6 +20,7 @@ public class LauncherConfig {
     private String botToken = "";
     private String chatId = "";
     private String picsToStartPath = "";
+    private String starRailCopilotPath = "";
 
     private String readmePath = "bot_sources/README.md";
 
@@ -34,7 +35,7 @@ public class LauncherConfig {
     private int sleepDurationMinutes = 12;
 
     private boolean weekSUEnabled = true;
-    private boolean monitoringEnabled = true;
+    private boolean SU_Monitoring = true;
 
     public List<String> getSuccessMessages() {
         if (successMessages == null) successMessages = new ArrayList<>();
@@ -59,7 +60,8 @@ public class LauncherConfig {
                 ", reportNotification=" + reportNotification +
                 ", sleepDurationMinutes=" + sleepDurationMinutes +
                 ", mondayCheckEnabled=" + weekSUEnabled +
-                ", monitoringEnabled=" + monitoringEnabled +
+                ", SU_Monitoring=" + SU_Monitoring +
+                ", starRailCopilotPath='" + starRailCopilotPath + '\'' +
                 "}";
     }
 }

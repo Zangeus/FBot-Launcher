@@ -7,9 +7,11 @@ import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 public class Notifier {
@@ -75,6 +77,23 @@ public class Notifier {
             TelegramBotSender.sendText("Ошибка! Не удалось отправить уведомление о сбое");
         }
     }
+
+    public static void notifyFailureWithFolder(String failMessage, File folder) {
+        notifyFailure(failMessage);
+
+        if (folder != null && folder.exists() && folder.isDirectory()) {
+            for (File file : Objects.requireNonNull(folder.listFiles())) {
+                if (file.isFile()) {
+                    if (file.getName().matches(".*\\.(png|jpg|jpeg|gif)$")) {
+                        TelegramBotSender.sendLocalPhoto(file.getAbsolutePath());
+                    } else {
+                        TelegramBotSender.sendDocument(file);
+                    }
+                }
+            }
+        }
+    }
+
 
     public static byte[] captureScreenshot() throws AWTException, IOException {
         Robot robot = new Robot();

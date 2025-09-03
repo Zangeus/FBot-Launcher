@@ -6,6 +6,10 @@ import org.json.JSONTokener;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public final class ConfigJson {
     private static final Path CONFIG_PATH = Paths.get("Q:/Z-folder/Bot_time/StarRailCopilot/config/src.json");
@@ -50,18 +54,31 @@ public final class ConfigJson {
         }
     }
 
-    public static synchronized boolean isSUCompleted() {
-        try {
-            JSONObject root = read();
-            JSONObject farm = root.getJSONObject("Rogue")
-                    .getJSONObject("RogueWorld")
+    public static boolean isSUCompletedThisWeek() {
+        try (FileReader reader = new FileReader(String.valueOf(CONFIG_PATH))) {
+            JSONObject root = new JSONObject(new JSONTokener(reader));
+            JSONObject su = root.getJSONObject("RogueWorld")
                     .getJSONObject("SimulatedUniverseFarm");
-            int total = farm.optInt("total", 100);
-            int value = farm.optInt("value", 0);
-            return total > 0 && value >= total;
+
+            int total = su.getInt("total");
+            int value = su.getInt("value");
+            String timeStr = su.optString("time", null);
+
+            if (timeStr == null) return false;
+
+            LocalDateTime suTime = LocalDateTime.parse(timeStr, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            LocalDate suDate = suTime.toLocalDate();
+
+            // вычисляем понедельник и воскресенье текущей недели
+            LocalDate today = LocalDate.now();
+            LocalDate monday = today.with(DayOfWeek.MONDAY);
+            LocalDate sunday = today.with(DayOfWeek.SUNDAY);
+
+            return value >= total && !suDate.isBefore(monday) && !suDate.isAfter(sunday);
         } catch (Exception e) {
-            System.err.println("Ошибка чтения SU прогресса: " + e.getMessage());
+            System.err.println("Ошибка в isSUCompletedThisWeek: " + e.getMessage());
             return false;
         }
     }
+
 }

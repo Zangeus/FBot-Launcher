@@ -166,11 +166,12 @@ public class ConfigWindow extends JFrame {
         config.setFailureNotification(generalPanel.isFailureNotificationEnabled());
         config.setReportNotification(generalPanel.isReportNotificationEnabled());
         config.setWeekSUEnabled(generalPanel.isWeekSUEnabled());
-        config.setMonitoringEnabled(generalPanel.isMonitoringEnabled());
+        config.setSU_Monitoring(generalPanel.isMonitoringEnabled());
 
         config.setBotToken(telegramPanel.getBotToken());
         config.setChatId(telegramPanel.getChatId());
         config.setPicsToStartPath(pathsPanel.getPicsPath());
+        config.setStarRailCopilotPath(pathsPanel.getStarRailCopilotPath());
 
         config.setSuccessMessages(messagesPanel.getSuccessMessages());
         config.setFailureMessages(messagesPanel.getFailureMessages());
@@ -382,9 +383,9 @@ public class ConfigWindow extends JFrame {
             monitoringStatusLabel.setForeground(StyleManager.TEXT_COLOR);
             updateMonitoringStatus();
 
-            monitoringToggleButton = new JButton(config.isMonitoringEnabled() ? "Деактивировать" : "Активировать");
+            monitoringToggleButton = new JButton(config.isSU_Monitoring() ? "Деактивировать" : "Активировать");
             StyleManager.styleButton(monitoringToggleButton,
-                    config.isMonitoringEnabled() ? StyleManager.DANGER_COLOR : StyleManager.PRIMARY_COLOR,
+                    config.isSU_Monitoring() ? StyleManager.DANGER_COLOR : StyleManager.PRIMARY_COLOR,
                     Color.WHITE
             );
             monitoringToggleButton.setPreferredSize(new Dimension(180, 35));
@@ -400,23 +401,23 @@ public class ConfigWindow extends JFrame {
         }
 
         private void toggleMonitoring() {
-            config.setMonitoringEnabled(!config.isMonitoringEnabled());
+            config.setSU_Monitoring(!config.isSU_Monitoring());
             updateMonitoringStatus();
             updateMonitoringButtonStyle();
         }
 
         private void updateMonitoringStatus() {
-            boolean isActive = config.isMonitoringEnabled();
+            boolean isActive = config.isSU_Monitoring();
             monitoringStatusLabel.setText("Мониторинг виртуальной вселенной: " +
                     (isActive ? "активен" : "неактивен"));
         }
 
         private void updateMonitoringButtonStyle() {
-            Color bgColor = config.isMonitoringEnabled() ?
+            Color bgColor = config.isSU_Monitoring() ?
                     StyleManager.DANGER_COLOR : StyleManager.PRIMARY_COLOR;
 
             monitoringToggleButton.setBackground(bgColor);
-            monitoringToggleButton.setText(config.isMonitoringEnabled() ? "Деактивировать" : "Активировать");
+            monitoringToggleButton.setText(config.isSU_Monitoring() ? "Деактивировать" : "Активировать");
         }
 
         private void loadConfigData() {
@@ -455,7 +456,7 @@ public class ConfigWindow extends JFrame {
         }
 
         public boolean isMonitoringEnabled() {
-            return config.isMonitoringEnabled();
+            return config.isSU_Monitoring();
         }
     }
 }

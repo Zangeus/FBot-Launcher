@@ -1,4 +1,4 @@
-package End;
+package Processes;
 
 import static Utils.WindowUtils.closeWindowByTitle;
 

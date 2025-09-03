@@ -2,25 +2,24 @@ package Waiters;
 
 import Config.ConfigManager;
 import Config.LauncherConfig;
-import End.CloseProcess;
-import End.EndWatcher;
-import Start.StartIsHere;
-import Utils.ErrorMonitoring;
+import Processes.CloseProcess;
+import Processes.EndWatcher;
+import Processes.Errors.ErrorMonitoring;
+import Processes.Errors.ErrorSeverity;
+import Processes.StartIsHere;
 
-import java.io.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 import static Waiters.TelegramBotSender.sendRandomMessage;
-
 
 public class Main {
     private static final String LOCK_FILE = "bot_sources/app.lock";
     private static final LauncherConfig config = ConfigManager.loadConfig();
     private static volatile boolean isRunning = true;
     private static boolean done = false;
+    private static boolean fatalExit = false;
     private static final int timeoutSeconds = 30;
     private static int maxAttempts = 3;
 
@@ -32,13 +31,14 @@ public class Main {
         isRunning = true;
 
         boolean isSURun = false;
-        if (config.isMonitoringEnabled()) {
+        if (config.isSU_Monitoring()) {
             maxAttempts = 999;
             isSURun = true;
             Utils.ConfigJson.setWeeklyFarming(true);
         } else Utils.ConfigJson.setWeeklyFarming(false);
 
         try {
+            ErrorMonitoring.initFromConfig(config);
             ErrorMonitoring.startAsync();
             EndWatcher.startAsync();
 
@@ -48,20 +48,45 @@ public class Main {
                 System.out.println("\n=== Попытка #" + attempt + " ===");
                 if (!StartIsHere.start(attempt)) continue;
 
-                if (waitForError()) {
+                System.out.println("--- Start error searching ---");
+                if (ErrorMonitoring.waitForStartError(30)) {
                     restart();
                     continue;
                 }
+                System.out.println("--- End searching ---");
 
                 while (isRunning) {
-                    if (EndWatcher.isStoppedSuccessfully() || Utils.ConfigJson.isSUCompleted()) {
-                        done = true;
-                        break;
+                    // --- Проверка на завершение ---
+                    if (EndWatcher.isStoppedSuccessfully()) {
+                        if (config.isSU_Monitoring() &&
+                                Utils.ConfigJson.isSUCompletedThisWeek()) {
+                            done = true;
+                            break;
+                        }
                     }
-                    if (waitForError()) {
-                        restart();
-                        break;
+
+                    ErrorSeverity severity = ErrorMonitoring.waitForError(timeoutSeconds);
+                    if (severity != null) {
+                        switch (severity) {
+                            case ROGUE_FAILED_3_TIMES:
+                                System.out.println("\uD83D\uDD04 Перезаходим в виртуалку");
+                                continue;
+
+                            case RECOVERABLE:
+                                System.out.println("\uD83D\uDD04 Перезапускаемся...");
+                                restart();
+                                break;
+
+                            case FATAL:
+                                System.out.println("❌ Фатальная ошибка → аварийное завершение");
+                                fatalExit = true;
+                                isRunning = false;
+                                done = false;
+                                return;
+                        }
                     }
+
+
                     sleepOneSecond();
                 }
 
@@ -73,30 +98,18 @@ public class Main {
             ErrorMonitoring.stop();
             EndWatcher.stop();
 
-            if (done) {
-                if (!isSURun) {
-                    if (config.isSuccessNotification()) sendRandomMessage(config.getSuccessMessages());
-                    performEmergencyShutdown();
-                } else completeSU();
-
-            } else {
-                if (config.isFailureNotification()) sendRandomMessage(config.getFailureMessages());
-                performEmergencyShutdown();
+            if (!fatalExit) {
+                if (done) {
+                    if (isSURun)
+                        completeSU();
+                    else if (config.isSuccessNotification())
+                        sendRandomMessage(config.getSuccessMessages());
+                }
+                else if (config.isFailureNotification())
+                        sendRandomMessage(config.getFailureMessages());
             }
-
+            performEmergencyShutdown();
             performFinalCleanup();
-        }
-    }
-
-    private static boolean waitForError() {
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<Boolean> future = executor.submit(() -> ErrorMonitoring.waitForSingleError(timeoutSeconds));
-        try {
-            return future.get(timeoutSeconds + 5, TimeUnit.SECONDS); // с запасом
-        } catch (Exception e) {
-            return false;
-        } finally {
-            executor.shutdownNow();
         }
     }
 
@@ -136,50 +149,28 @@ public class Main {
         }
     }
 
-
     private static boolean acquireLock() {
         try {
             File lockFile = new File(LOCK_FILE);
 
-            // Если файл уже существует → читаем PID
             if (lockFile.exists()) {
-                try (BufferedReader br = new BufferedReader(new FileReader(lockFile))) {
-                    String pidStr = br.readLine();
-                    if (pidStr != null) {
-                        long pid = Long.parseLong(pidStr.trim());
-                        // Проверяем жив ли процесс
-                        if (isProcessRunning(pid)) {
-                            System.err.println("⚠ Программа уже запущена с PID " + pid);
-                            return false;
-                        }
-                    }
-                } catch (Exception ignored) {}
+                return false; // или добавить проверку PID
             }
 
-            // Пишем свой PID в lock-файл
-            long currentPid = ProcessHandle.current().pid();
-            try (FileWriter fw = new FileWriter(lockFile, false)) {
-                fw.write(Long.toString(currentPid));
+            if (!lockFile.createNewFile()) {
+                return false;
             }
 
-            // Чистим при завершении
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                if (lockFile.exists()) {
-                    if (!lockFile.delete()) {
-                        System.err.println("⚠ Не удалось удалить lock-файл");
-                    }
+                if (lockFile.exists() && !lockFile.delete()) {
+                    System.err.println("⚠ Не удалось удалить lock-файл");
                 }
             }));
 
             return true;
         } catch (IOException e) {
-            System.err.println("Ошибка acquireLock: " + e.getMessage());
             return false;
         }
-    }
-
-    private static boolean isProcessRunning(long pid) {
-        return ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
     }
 
     public static void completeSU() {
@@ -188,7 +179,7 @@ public class Main {
         TelegramBotSender.sendLocalPhoto("bot_sources/SU.png");
         TelegramBotSender.sendText("Исследование Виртуальной вселенной завершено");
 
-        config.setMonitoringEnabled(false);
+        config.setSU_Monitoring(false);
         ConfigManager.saveConfig(config);
         performEmergencyShutdown();
     }

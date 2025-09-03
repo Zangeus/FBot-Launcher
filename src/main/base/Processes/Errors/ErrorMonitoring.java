@@ -1,5 +1,8 @@
-package Utils;
+package Processes.Errors;
 
+import Config.LauncherConfig;
+import Utils.ClickByCoords;
+import Utils.Notifier;
 import Waiters.TelegramBotSender;
 import org.apache.commons.io.input.Tailer;
 import org.apache.commons.io.input.TailerListenerAdapter;
@@ -9,9 +12,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.Comparator;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Stream;
 
@@ -19,13 +20,13 @@ import static Utils.ClickByCoords.activateAndClick;
 import static Utils.ClickByCoords.performClick;
 import static Utils.FindButtonAndPress.findAndClickWithMessage;
 
-
 public class ErrorMonitoring {
-    private static final String ERROR_DIR = "Q:/Z-folder/Bot_time/StarRailCopilot/log/error";
-    private static final String MAIN_LOG_DIR = "Q:/Z-folder/Bot_time/StarRailCopilot/log";
     private static final Set<String> reportedErrors = ConcurrentHashMap.newKeySet();
-
+    private static final BlockingQueue<ErrorSeverity> errorQueue = new LinkedBlockingQueue<>();
+    private static String ERROR_DIR;
+    private static String MAIN_LOG_DIR;
     private static ExecutorService executor;
+    private static final ExecutorService singleExecutor = Executors.newSingleThreadExecutor();
     private static volatile boolean running = false;
 
     public static synchronized void startAsync() {
@@ -34,13 +35,16 @@ public class ErrorMonitoring {
         running = true;
         executor = Executors.newFixedThreadPool(2);
 
-        // мониторинг error/ директорий
         executor.submit(() -> monitorErrorDir(ERROR_DIR));
-
-        // мониторинг src-логов (с авто-переключением на новый файл)
         executor.submit(ErrorMonitoring::monitorMainLogs);
 
         System.out.println("▶ ErrorMonitoring запущен для: " + ERROR_DIR + " и " + MAIN_LOG_DIR);
+    }
+
+    public static void initFromConfig(LauncherConfig config) {
+        String basePath = config.getStarRailCopilotPath();
+        ERROR_DIR = basePath + "/log/error";
+        MAIN_LOG_DIR = basePath + "/log";
     }
 
     public static synchronized void stop() {
@@ -51,7 +55,16 @@ public class ErrorMonitoring {
         }
     }
 
-    public static boolean waitForSingleError(int timeoutSeconds) {
+    public static ErrorSeverity waitForError(int timeoutSeconds) {
+        try {
+            return errorQueue.poll(timeoutSeconds, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
+    }
+
+    public static boolean waitForStartError(int timeoutSeconds) {
         try (WatchService watcher = FileSystems.getDefault().newWatchService()) {
             Path dir = Paths.get(ERROR_DIR);
             dir.register(watcher, StandardWatchEventKinds.ENTRY_CREATE);
@@ -62,13 +75,13 @@ public class ErrorMonitoring {
             for (WatchEvent<?> event : key.pollEvents()) {
                 Path newPath = dir.resolve((Path) event.context());
                 if (Files.isDirectory(newPath)) {
-                    handleErrorFolder(newPath.toFile(), false);
+                    handleErrorFolder(newPath.toFile());
                     return true;
                 }
             }
             return false;
         } catch (Exception e) {
-            System.err.println("Ошибка в waitForSingleError: " + e.getMessage());
+            System.err.println("Ошибка в waitForStartError: " + e.getMessage());
             return false;
         }
     }
@@ -85,43 +98,22 @@ public class ErrorMonitoring {
                 for (WatchEvent<?> event : key.pollEvents()) {
                     Path newPath = dir.resolve((Path) event.context());
                     if (Files.isDirectory(newPath)) {
-                        handleErrorFolder(newPath.toFile(), true);
+                        handleErrorFolder(newPath.toFile());
                     }
                 }
                 key.reset();
             }
         } catch (Exception e) {
-            if (running) TelegramBotSender.sendText("Ошибка в ErrorMonitoring (error/): " + e.getMessage());
+            if (running) Notifier.notifyFailure("Ошибка в ErrorMonitoring (error/): " + e.getMessage());
         }
     }
 
-    private static void handleErrorFolder(File folder, boolean fromAsync) {
+    private static void handleErrorFolder(File folder) {
         try {
             String baseMsg = "❌ Обнаружена ошибка!\n📂 " + folder.getName();
             if (!reportedErrors.add(folder.getName())) return;
 
-            TelegramBotSender.sendText(baseMsg);
-
-            for (File file : Objects.requireNonNull(folder.listFiles())) {
-                if (file.isFile()) {
-                    if (file.getName().matches(".*\\.(png|jpg|jpeg|gif)$")) {
-                        TelegramBotSender.sendLocalPhoto(file.getAbsolutePath());
-                    } else {
-                        TelegramBotSender.sendDocument(file);
-                    }
-                }
-            }
-
-            if (fromAsync) {
-                Executors.newSingleThreadExecutor().submit(() -> {
-                    try {
-                        System.out.println("♻ Перезапуск через reenterIntoSU() из-за ошибки");
-                        reenterIntoSU();
-                    } catch (Exception e) {
-                        System.err.println("Ошибка при reenterIntoSU: " + e.getMessage());
-                    }
-                });
-            }
+            Notifier.notifyFailureWithFolder(baseMsg, folder);
 
         } catch (Exception e) {
             System.err.println("Ошибка при обработке папки: " + e.getMessage());
@@ -143,9 +135,8 @@ public class ErrorMonitoring {
             System.out.println("▶ Мониторинг src-лога: " + currentLog);
 
             while (running) {
-                tailFile(currentLog); // блокирующий tailer, выйдет только при stop()
+                tailFile(currentLog);
 
-                // ждём новый файл
                 WatchKey key = watcher.take();
                 for (WatchEvent<?> event : key.pollEvents()) {
                     Path newPath = dir.resolve((Path) event.context());
@@ -157,7 +148,7 @@ public class ErrorMonitoring {
                 key.reset();
             }
         } catch (Exception e) {
-            if (running) TelegramBotSender.sendText("Ошибка в мониторинге src-логов: " + e.getMessage());
+            if (running) Notifier.notifyFailure("Ошибка в мониторинге src-логов: " + e.getMessage());
         }
     }
 
@@ -177,38 +168,75 @@ public class ErrorMonitoring {
                 .setCharset(StandardCharsets.UTF_8)
                 .setTailerListener(new TailerListenerAdapter() {
                     private final StringBuilder buffer = new StringBuilder();
-                    private boolean collecting = false;
+                    private final Deque<String> recentLines = new ArrayDeque<>(10);
 
                     @Override
                     public void handle(String line) {
                         if (!running) return;
 
-                        if (line.contains("ERROR") || line.contains("CRITICAL")
-                                || line.contains("Traceback")
-                                || line.contains("Game died during launch")
-                                || line.contains("Request human takeover")) {
-                            collecting = true;
-                            buffer.setLength(0);
+                        if (recentLines.size() >= 10) {
+                            recentLines.removeFirst();
+                        }
+                        recentLines.addLast(line);
+
+                        ErrorSeverity severity = ErrorRules.classify(line);
+
+                        // спец-правило: Request human takeover + RogueFail → понижаем до reenter
+                        if (severity == ErrorSeverity.FATAL && line.contains("Request human takeover")) {
+                            boolean rogueNearby = recentLines.stream()
+                                    .anyMatch(l -> l.contains("Task `Rogue` failed 3 or more times."));
+                            if (rogueNearby) {
+                                severity = ErrorSeverity.ROGUE_FAILED_3_TIMES;
+                            }
+                        }
+
+                        if (severity != null) {
                             buffer.append(line).append("\n");
-                        } else if (collecting) {
-                            if (line.trim().isEmpty() || line.startsWith("2025-")) {
-                                flushError();
-                            } else {
-                                buffer.append(line).append("\n");
+                            try {
+                                flushError(buffer, severity);
+                            } catch (InterruptedException e) {
+                                TelegramBotSender.sendText("Ошибка добавления в пул: " + e.getMessage());
                             }
                         }
                     }
 
-                    private void flushError() {
-                        if (buffer.length() > 0) {
-                            String errorMsg = buffer.toString().trim();
-                            if (reportedErrors.add(errorMsg)) {
-                                TelegramBotSender.sendText("❌ Обнаружена ошибка в src-логе:\n\n" + errorMsg);
-                            }
-                            buffer.setLength(0);
+                    private void flushError(StringBuilder buffer, ErrorSeverity severity) throws InterruptedException {
+                        if (buffer.length() == 0) return;
+
+                        String errorMsg = buffer.toString().trim();
+                        if (!reportedErrors.add(errorMsg)) return;
+
+                        boolean offered;
+                        switch (severity) {
+                            case ROGUE_FAILED_3_TIMES:
+                                Notifier.notifyFailure("🔄 Перезаходим в виртуалку\n\n" + errorMsg);
+                                singleExecutor.submit(ErrorMonitoring::reenterIntoSU);
+                                offered = errorQueue.offer(ErrorSeverity.ROGUE_FAILED_3_TIMES, 2, TimeUnit.SECONDS);
+                                if (!offered) {
+                                    TelegramBotSender.sendText("⚠ Очередь ошибок переполнена (ROGUE_FAILED_3_TIMES)");
+                                }
+                                break;
+
+                            case RECOVERABLE:
+                                Notifier.notifyFailure("🔄 Перезапускаемся...\n\n" + errorMsg);
+                                offered = errorQueue.offer(ErrorSeverity.RECOVERABLE, 2, TimeUnit.SECONDS);
+                                if (!offered) {
+                                    TelegramBotSender.sendText("⚠ Очередь ошибок переполнена (RECOVERABLE)");
+                                }
+                                break;
+
+                            case FATAL:
+                                Notifier.notifyFailure("❌ Фатальная ошибка:\n\n" + errorMsg);
+                                offered = errorQueue.offer(ErrorSeverity.FATAL, 2, TimeUnit.SECONDS);
+                                if (!offered) {
+                                    TelegramBotSender.sendText("⚠ Очередь ошибок переполнена (FATAL)");
+                                }
+                                break;
                         }
-                        collecting = false;
+
+                        buffer.setLength(0);
                     }
+
                 })
                 .setTailFromEnd(true)
                 .get();
@@ -216,6 +244,7 @@ public class ErrorMonitoring {
         tailer.run();
     }
 
+    // ─── reenterIntoSU ───────────────────────────────
     private static final String MuMu = "Android Device";
     private static final String src = "src";
     private static final Point[] CLICK_POINTS = {
@@ -229,7 +258,7 @@ public class ErrorMonitoring {
         try {
             Thread.sleep(3000);
         } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+            Thread.currentThread().interrupt();
         }
         performClick(780, 675, 0);
 

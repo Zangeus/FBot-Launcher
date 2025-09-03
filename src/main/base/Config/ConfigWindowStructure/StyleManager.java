@@ -1,27 +1,34 @@
 package Config.ConfigWindowStructure;
 
+import com.formdev.flatlaf.FlatDarkLaf;
+import com.formdev.flatlaf.FlatLightLaf;
+import lombok.Getter;
+
 import javax.swing.*;
 import javax.swing.border.Border;
 import java.awt.*;
 
 public class StyleManager {
 
-    public static final Color PRIMARY_COLOR = new Color(70, 130, 180);
-    public static final Color DANGER_COLOR = new Color(220, 80, 80);
-    public static final Color WARNING_COLOR = new Color(255, 165, 0);
-    public static final Color SUCCESS_COLOR = new Color(15, 157, 88);
-    public static final Color SECONDARY_COLOR = new Color(66, 133, 244);
-    public static final Color TEXT_COLOR = new Color(50, 50, 50);
-    public static final Color BORDER_COLOR = new Color(200, 200, 200);
+    @Getter
+    private static boolean darkTheme = true; // по умолчанию тёмная
 
-    public static final Font BASE_FONT = new Font("Segoe UI", Font.PLAIN, 14);
-    public static final Font HEADER_FONT = new Font("Segoe UI SemiBold", Font.BOLD, 16);
-    public static final Font TITLE_FONT = new Font("Segoe UI SemiBold", Font.BOLD, 18);
-    public static final Font BUTTON_FONT = new Font("Segoe UI SemiBold", Font.BOLD, 14);
-    public static final Font SMALLER_FONT = new Font("Segoe UI", Font.PLAIN, 12);
+    public static final Color PRIMARY_COLOR   = new Color(90, 156, 248);
+    public static final Color DANGER_COLOR    = new Color(220, 80, 80);
+    public static final Color WARNING_COLOR   = new Color(255, 193, 7);
+    public static final Color SUCCESS_COLOR   = new Color(76, 175, 80);
+    public static final Color SECONDARY_COLOR = new Color(66, 133, 244);
+    public static final Color TEXT_COLOR      = new Color(230, 230, 230);
+    public static final Color BORDER_COLOR    = new Color(80, 80, 80);
+
+    public static final Font BASE_FONT     = new Font("Segoe UI", Font.PLAIN, 14);
+    public static final Font HEADER_FONT   = new Font("Segoe UI Semibold", Font.BOLD, 16);
+    public static final Font TITLE_FONT    = new Font("Segoe UI Semibold", Font.BOLD, 18);
+    public static final Font BUTTON_FONT   = new Font("Segoe UI Semibold", Font.BOLD, 14);
+    public static final Font SMALLER_FONT  = new Font("Segoe UI", Font.PLAIN, 12);
 
     public static void styleButton(JButton button, Color bgColor, Color textColor) {
-        button.setFont(BUTTON_FONT.deriveFont(Font.BOLD));
+        button.setFont(BUTTON_FONT);
         button.setForeground(textColor);
         button.setBackground(bgColor);
         button.setFocusPainted(false);
@@ -32,19 +39,15 @@ public class StyleManager {
 
         Border emptyBorder = BorderFactory.createEmptyBorder(10, 25, 10, 25);
         Border lineBorder = BorderFactory.createLineBorder(bgColor.darker(), 1);
-        Border compoundBorder = BorderFactory.createCompoundBorder(lineBorder, emptyBorder);
-        button.setBorder(compoundBorder);
+        button.setBorder(BorderFactory.createCompoundBorder(lineBorder, emptyBorder));
 
-        button.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(
-                KeyStroke.getKeyStroke("SPACE"), "none"
-        );
-        button.addActionListener(e -> {
-            Timer pressTimer = new Timer(50, ev -> button.setBorder(BorderFactory.createCompoundBorder(
-                    BorderFactory.createLineBorder(bgColor.darker().darker(), 1),
-                    emptyBorder
-            )));
-            pressTimer.setRepeats(false);
-            pressTimer.start();
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setBackground(bgColor.brighter());
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                button.setBackground(bgColor);
+            }
         });
     }
 
@@ -67,10 +70,20 @@ public class StyleManager {
 
     public static void setupUIManager() {
         try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-            UIManager.put("Button.arc", 8);
-            UIManager.put("Component.arc", 8);
-            UIManager.put("TextComponent.arc", 5);
+            if (darkTheme) {
+                UIManager.setLookAndFeel(new FlatDarkLaf());
+            } else {
+                UIManager.setLookAndFeel(new FlatLightLaf());
+            }
+
+            UIManager.put("Button.arc", 12);
+            UIManager.put("Component.arc", 12);
+            UIManager.put("TextComponent.arc", 10);
+
+            UIManager.put("TabbedPane.showTabSeparators", true);
+            UIManager.put("TabbedPane.tabsUnderline", true);
+            UIManager.put("TabbedPane.selectedBackground", PRIMARY_COLOR);
+
             UIManager.put("Button.font", BUTTON_FONT);
             UIManager.put("Label.font", BASE_FONT);
             UIManager.put("TextField.font", BASE_FONT);
@@ -78,7 +91,16 @@ public class StyleManager {
             UIManager.put("Spinner.font", BASE_FONT);
             UIManager.put("CheckBox.font", BASE_FONT);
             UIManager.put("TabbedPane.font", TITLE_FONT);
-        } catch (Exception ignored) {
+
+        } catch (Exception e) {
+            System.err.println("⚠ Не удалось применить FlatLaf: " + e.getMessage());
         }
     }
+
+    public static void setDarkTheme(boolean dark) {
+        darkTheme = dark;
+        setupUIManager();
+        SwingUtilities.updateComponentTreeUI(JFrame.getFrames()[0]); // обновляем окно
+    }
+
 }

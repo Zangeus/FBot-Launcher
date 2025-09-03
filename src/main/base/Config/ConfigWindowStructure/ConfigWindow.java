@@ -21,6 +21,8 @@ public class ConfigWindow extends JFrame {
     private static final int MAX_WIDTH = 950;
     private static final int PREF_HEIGHT = 600;
 
+
+
     public ConfigWindow() {
         config = ConfigManager.loadConfig();
         loadCustomFont();
@@ -28,6 +30,8 @@ public class ConfigWindow extends JFrame {
     }
 
     private void initUI() {
+        // применяем тему из конфига ДО setupUIManager
+        StyleManager.setDarkTheme(config.isDarkThemeEnabled());
         StyleManager.setupUIManager();
 
         setTitle("Настройки приложения");
@@ -77,7 +81,6 @@ public class ConfigWindow extends JFrame {
         });
 
         addCloseButton(bgPanel);
-
         initComponents();
     }
 
@@ -165,7 +168,7 @@ public class ConfigWindow extends JFrame {
         config.setSuccessNotification(generalPanel.isSuccessNotificationEnabled());
         config.setFailureNotification(generalPanel.isFailureNotificationEnabled());
         config.setReportNotification(generalPanel.isReportNotificationEnabled());
-        config.setWeekSUEnabled(generalPanel.isWeekSUEnabled());
+        config.setDarkThemeEnabled(generalPanel.isDarkThemeEnabled());
         config.setSU_Monitoring(generalPanel.isMonitoringEnabled());
 
         config.setBotToken(telegramPanel.getBotToken());
@@ -277,7 +280,7 @@ public class ConfigWindow extends JFrame {
         private JCheckBox successCheck;
         private JCheckBox failureCheck;
         private JCheckBox reportCheck;
-        private JCheckBox weekSUCheck;
+        private JCheckBox darkThemeCheck;
         private JLabel monitoringStatusLabel;
         private JButton monitoringToggleButton;
 
@@ -288,6 +291,7 @@ public class ConfigWindow extends JFrame {
         }
 
         private void initUI() {
+
             setLayout(new GridBagLayout());
             GridBagConstraints gbc = new GridBagConstraints();
             gbc.insets = new Insets(5, 20, 5, 5);
@@ -352,10 +356,20 @@ public class ConfigWindow extends JFrame {
             gbc.gridy = 5;
             add(reportCheck, gbc);
 
-            weekSUCheck = new JCheckBox("Недельная виртуалка");
-            weekSUCheck.setFont(StyleManager.BASE_FONT);
+            darkThemeCheck = new JCheckBox("Тёмная тема");
+            darkThemeCheck.setFont(StyleManager.BASE_FONT);
+            darkThemeCheck.setSelected(config.isDarkThemeEnabled()); // грузим из конфига
+            darkThemeCheck.addActionListener(e -> {
+                StyleManager.setDarkTheme(darkThemeCheck.isSelected());
+                config.setDarkThemeEnabled(darkThemeCheck.isSelected());
+                ConfigManager.saveConfig(config);
+
+                SwingUtilities.updateComponentTreeUI(SwingUtilities.getWindowAncestor(this));
+                updateMonitoringStatus(); // обновляем цвет текста вручную
+            });
+
             gbc.gridy = 6;
-            add(weekSUCheck, gbc);
+            add(darkThemeCheck, gbc);
 
             // Панель мониторинга - тоже полная ширина
             gbc.gridy = 7;
@@ -380,7 +394,10 @@ public class ConfigWindow extends JFrame {
 
             monitoringStatusLabel = new JLabel();
             monitoringStatusLabel.setFont(StyleManager.BASE_FONT.deriveFont(Font.BOLD));
-            monitoringStatusLabel.setForeground(StyleManager.TEXT_COLOR);
+
+            // 🔑 Даем FlatLaf самому красить надпись
+            monitoringStatusLabel.putClientProperty("FlatLaf.styleClass", "default");
+
             updateMonitoringStatus();
 
             monitoringToggleButton = new JButton(config.isSU_Monitoring() ? "Деактивировать" : "Активировать");
@@ -400,16 +417,16 @@ public class ConfigWindow extends JFrame {
             return panel;
         }
 
-        private void toggleMonitoring() {
-            config.setSU_Monitoring(!config.isSU_Monitoring());
-            updateMonitoringStatus();
-            updateMonitoringButtonStyle();
-        }
-
         private void updateMonitoringStatus() {
             boolean isActive = config.isSU_Monitoring();
             monitoringStatusLabel.setText("Мониторинг виртуальной вселенной: " +
                     (isActive ? "активен" : "неактивен"));
+        }
+
+        private void toggleMonitoring() {
+            config.setSU_Monitoring(!config.isSU_Monitoring());
+            updateMonitoringStatus();
+            updateMonitoringButtonStyle();
         }
 
         private void updateMonitoringButtonStyle() {
@@ -426,7 +443,7 @@ public class ConfigWindow extends JFrame {
             successCheck.setSelected(config.isSuccessNotification());
             failureCheck.setSelected(config.isFailureNotification());
             reportCheck.setSelected(config.isReportNotification());
-            weekSUCheck.setSelected(config.isWeekSUEnabled());
+            darkThemeCheck.setSelected(config.isDarkThemeEnabled());
             updateMonitoringStatus();
             updateMonitoringButtonStyle();
         }
@@ -451,8 +468,8 @@ public class ConfigWindow extends JFrame {
             return reportCheck.isSelected();
         }
 
-        public boolean isWeekSUEnabled() {
-            return weekSUCheck.isSelected();
+        public boolean isDarkThemeEnabled() {
+            return darkThemeCheck.isSelected();
         }
 
         public boolean isMonitoringEnabled() {

@@ -34,7 +34,7 @@ public class LauncherConfig {
 
     private int sleepDurationMinutes = 12;
 
-    private boolean weekSUEnabled = true;
+    private boolean darkThemeEnabled = true;
     private boolean SU_Monitoring = true;
 
     public List<String> getSuccessMessages() {
@@ -59,7 +59,7 @@ public class LauncherConfig {
                 ", failureNotification=" + failureNotification +
                 ", reportNotification=" + reportNotification +
                 ", sleepDurationMinutes=" + sleepDurationMinutes +
-                ", mondayCheckEnabled=" + weekSUEnabled +
+                ", darkThemeEnabled=" + darkThemeEnabled +
                 ", SU_Monitoring=" + SU_Monitoring +
                 ", starRailCopilotPath='" + starRailCopilotPath + '\'' +
                 "}";

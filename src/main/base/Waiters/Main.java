@@ -39,6 +39,8 @@ public class Main {
 
         try {
             ErrorMonitoring.initFromConfig(config);
+            EndWatcher.initFromConfig(config);
+
             ErrorMonitoring.startAsync();
             EndWatcher.startAsync();
 

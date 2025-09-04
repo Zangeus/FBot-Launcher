@@ -1,5 +1,6 @@
 package Processes;
 
+import Config.LauncherConfig;
 import lombok.Getter;
 import org.apache.commons.io.input.Tailer;
 import org.apache.commons.io.input.TailerListenerAdapter;
@@ -18,14 +19,20 @@ import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 
 public class EndWatcher {
-    private static final String LOG_DIR = "Q:/Z-folder/Bot_time/StarRailCopilot/log";
-    private static final String CONFIG_PATH = "Q:/Z-folder/Bot_time/StarRailCopilot/config/src.json";
+    private static String CONFIG_PATH;
+    private static String MAIN_LOG_DIR;
 
     private static String lastEventTime = "";
     private static ExecutorService executor;
     private static volatile boolean running = false;
     @Getter
     private static volatile boolean stoppedSuccessfully = false;
+
+    public static void initFromConfig(LauncherConfig config) {
+        String basePath = config.getStarRailCopilotPath();
+        CONFIG_PATH = basePath + "/config/src.json";
+        MAIN_LOG_DIR = basePath + "/log";
+    }
 
     public static synchronized void startAsync() {
         stop();
@@ -36,12 +43,12 @@ public class EndWatcher {
         executor.submit(() -> {
             try {
                 File logFile;
-                try (Stream<Path> files = Files.list(Paths.get(LOG_DIR))) {
+                try (Stream<Path> files = Files.list(Paths.get(MAIN_LOG_DIR))) {
                     logFile = files
                             .filter(p -> p.getFileName().toString().endsWith("_src.txt"))
                             .map(Path::toFile)
                             .max(Comparator.comparingLong(File::lastModified))
-                            .orElseThrow(() -> new RuntimeException("Не найден файл *_src.txt в " + LOG_DIR));
+                            .orElseThrow(() -> new RuntimeException("Не найден файл *_src.txt в " + MAIN_LOG_DIR));
                 }
 
                 System.out.println("▶ EndWatcher запущен для файла: " + logFile);

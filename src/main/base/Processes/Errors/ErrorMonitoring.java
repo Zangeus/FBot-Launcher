@@ -1,6 +1,5 @@
 package Processes.Errors;
 
-import Config.ConfigManager;
 import Config.LauncherConfig;
 import Utils.ClickByCoords;
 import Utils.Notifier;
@@ -202,10 +201,8 @@ public class ErrorMonitoring {
             } else {
                 latest = logs.stream()
                         .max(Comparator.comparingLong(File::lastModified))
-                        .orElse(null);
-                if (latest != null) {
-                    System.out.println("⚠ Нет свежих логов. Используем самый новый из старых: " + latest.getName());
-                }
+                        .orElseThrow(); // уже точно не пусто
+                System.out.println("⚠ Нет свежих логов. Используем самый новый из старых: " + latest.getName());
             }
 
             return latest;

@@ -25,10 +25,14 @@ import static Utils.FindButtonAndPress.findAndClickWithMessage;
 public class ErrorMonitoring {
     private static final Set<String> reportedErrors = ConcurrentHashMap.newKeySet();
     private static final BlockingQueue<ErrorSeverity> errorQueue = new LinkedBlockingQueue<>();
+    private static final long START_IGNORE_MS = TimeUnit.SECONDS.toMillis(10); // 10 секунд игнор в начале запуска
+    private static long startTime = System.currentTimeMillis();
 
     private static String ERROR_DIR;
     private static String MAIN_LOG_DIR;
     private static List<String> FAILURE_MESSAGES;
+    private static boolean NOTIFY_ON_FAIL;
+    private static boolean NOTIFY_ON_REPORT;
 
     private static ExecutorService executor;
     private static final ExecutorService singleExecutor = Executors.newSingleThreadExecutor();
@@ -41,6 +45,7 @@ public class ErrorMonitoring {
     public static synchronized void startAsync() {
         stop();
 
+        startTime = System.currentTimeMillis();
         running = true;
         executor = Executors.newFixedThreadPool(3);
 
@@ -55,7 +60,10 @@ public class ErrorMonitoring {
         String basePath = config.getStarRailCopilotPath();
         ERROR_DIR = basePath + "/log/error";
         MAIN_LOG_DIR = basePath + "/log";
+
         FAILURE_MESSAGES = config.getFailureMessages();
+        NOTIFY_ON_FAIL = config.isFailureNotification();
+        NOTIFY_ON_REPORT = config.isReportNotification();
     }
 
     public static synchronized void stop() {
@@ -160,7 +168,7 @@ public class ErrorMonitoring {
                 key.reset();
             }
         } catch (Exception e) {
-            if (running) Notifier.notifyFailure("Ошибка в мониторинге src-логов: " + e.getMessage());
+            if (running && NOTIFY_ON_FAIL) Notifier.notifyFailure("Ошибка в мониторинге src-логов: " + e.getMessage());
         }
     }
 
@@ -223,9 +231,6 @@ public class ErrorMonitoring {
                     @Override
                     public void handle(String line) {
                         if (!running) return;
-                        System.out.println("[DEBUG] Новая строка: " + line);
-
-                        // обновляем время активности
                         lastLogTime = System.currentTimeMillis();
 
                         if (recentLines.size() >= 10) {
@@ -235,8 +240,12 @@ public class ErrorMonitoring {
 
                         ErrorSeverity severity = ErrorRules.classify(line);
 
-                        // спец-правило: Request human takeover + RogueFail → понижаем до reenter
                         if (severity == ErrorSeverity.FATAL && line.contains("Request human takeover")) {
+                            if (System.currentTimeMillis() - startTime < START_IGNORE_MS) {
+                                System.out.println("⚠ Игнорируем Request human takeover (grace period)");
+                                return;
+                            }
+
                             boolean rogueNearby = recentLines.stream()
                                     .anyMatch(l -> l.contains("Task `Rogue` failed 3 or more times."));
                             if (rogueNearby) {
@@ -249,7 +258,8 @@ public class ErrorMonitoring {
                             try {
                                 flushError(buffer, severity);
                             } catch (InterruptedException e) {
-                                TelegramBotSender.sendText("Ошибка добавления в пул: " + e.getMessage());
+                                if (NOTIFY_ON_FAIL)
+                                    TelegramBotSender.sendText("Ошибка добавления в пул: " + e.getMessage());
                             }
                         }
                     }
@@ -263,26 +273,40 @@ public class ErrorMonitoring {
                         boolean offered;
                         switch (severity) {
                             case ROGUE_FAILED_3_TIMES:
-                                Notifier.notifyFailure("🔄 Перезаходим в виртуалку\n\n" + errorMsg);
+                                if (NOTIFY_ON_REPORT)
+                                    Notifier.notifyFailure("🔄 Перезаходим в виртуалку\n\n" + errorMsg);
                                 singleExecutor.submit(ErrorMonitoring::reenterIntoSU);
                                 offered = errorQueue.offer(ErrorSeverity.ROGUE_FAILED_3_TIMES, 2, TimeUnit.SECONDS);
-                                if (!offered) {
+                                if (!offered && NOTIFY_ON_FAIL) {
                                     TelegramBotSender.sendText("⚠ Очередь ошибок переполнена (ROGUE_FAILED_3_TIMES)");
                                 }
                                 break;
 
                             case RECOVERABLE:
-                                Notifier.notifyFailure("🔄 Перезапускаемся...\n\n" + errorMsg);
+                                if (NOTIFY_ON_REPORT)
+                                    Notifier.notifyFailure("🔄 Перезапускаемся...\n\n" + errorMsg);
                                 offered = errorQueue.offer(ErrorSeverity.RECOVERABLE, 2, TimeUnit.SECONDS);
-                                if (!offered) {
+                                if (!offered && NOTIFY_ON_FAIL) {
                                     TelegramBotSender.sendText("⚠ Очередь ошибок переполнена (RECOVERABLE)");
                                 }
                                 break;
 
                             case FATAL:
-                                Notifier.notifyFailure("(ノ_<。) "+ FAILURE_MESSAGES +"\n\n" + errorMsg);
+                                List<String> kaomojis = Arrays.asList(
+                                        "(ノ_<。)",
+                                        "(x_x)",
+                                        "(；￣Д￣)",
+                                        "(╯°□°）╯︵ ┻━┻",
+                                        "(≧д≦ヾ)",
+                                        "(｡•́︿•̀｡)"
+                                );
+                                String face = kaomojis.get(new Random().nextInt(kaomojis.size()));
+
+                                if (NOTIFY_ON_FAIL)
+                                    Notifier.notifyFailure(face + " " + FAILURE_MESSAGES + "\n\n" + errorMsg);
+
                                 offered = errorQueue.offer(ErrorSeverity.FATAL, 2, TimeUnit.SECONDS);
-                                if (!offered) {
+                                if (!offered && NOTIFY_ON_FAIL) {
                                     TelegramBotSender.sendText("⚠ Очередь ошибок переполнена (FATAL)");
                                 }
                                 break;
@@ -325,10 +349,11 @@ public class ErrorMonitoring {
 
     private static void handleSilenceTimeout() {
         String msg = "⚠ В лог не писалось более 5 минут!";
-        Notifier.notifyFailure(msg);
+        if (NOTIFY_ON_FAIL)
+            Notifier.notifyFailure(msg);
 
         boolean offered = errorQueue.offer(ErrorSeverity.FATAL);
-        if (!offered) {
+        if (!offered && NOTIFY_ON_FAIL) {
             TelegramBotSender.sendText("⚠ Очередь ошибок переполнена (SILENCE TIMEOUT)");
         }
 

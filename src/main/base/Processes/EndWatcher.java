@@ -1,5 +1,6 @@
 package Processes;
 
+import Config.ConfigManager;
 import Config.LauncherConfig;
 import lombok.Getter;
 import org.apache.commons.io.input.Tailer;
@@ -27,6 +28,7 @@ public class EndWatcher {
     private static volatile boolean running = false;
     @Getter
     private static volatile boolean stoppedSuccessfully = false;
+    private static final boolean notifyOnSuccess = ConfigManager.loadConfig().isSuccessNotification();
 
     public static void initFromConfig(LauncherConfig config) {
         String basePath = config.getStarRailCopilotPath();
@@ -86,8 +88,9 @@ public class EndWatcher {
                 String ts = extractTimestamp(line);
                 if (!ts.equals(lastEventTime)) {
                     lastEventTime = ts;
-                    String progress = readProgressFromJson();
-                    TelegramBotSender.sendText("✅ Эмулятор остановлен успешно!\n\n⏱ " + ts + "\n" + progress);
+
+                    if (notifyOnSuccess)
+                        TelegramBotSender.sendText(readProgressFromJson().toString());
                 }
             }
         }
@@ -97,7 +100,7 @@ public class EndWatcher {
         return line.length() >= 23 ? line.substring(0, 23) : "???";
     }
 
-    private static String readProgressFromJson() {
+    private static ProgressInfo readProgressFromJson() {
         try (FileReader reader = new FileReader(CONFIG_PATH)) {
             JSONObject root = new JSONObject(new JSONTokener(reader));
 
@@ -107,32 +110,30 @@ public class EndWatcher {
             int dailyVal = daily.getInt("value");
             int dailyTotal = daily.getInt("total");
 
-            String creditStr = "- Credit: нет данных";
-            String jadeStr = "- Jade: нет данных";
+            long creditVal = 0;
+            int jadeVal = 0;
+
             JSONObject dataUpdate = root.optJSONObject("DataUpdate");
             if (dataUpdate != null) {
                 JSONObject itemStorage = dataUpdate.optJSONObject("ItemStorage");
                 if (itemStorage != null) {
                     JSONObject credit = itemStorage.optJSONObject("Credit");
                     if (credit != null) {
-                        long creditVal = credit.optLong("value", 0);
-                        creditStr = "- Credit: " + creditVal;
+                        creditVal = credit.optLong("value", 0);
                     }
 
                     JSONObject jade = itemStorage.optJSONObject("StallerJade");
                     if (jade != null) {
-                        int jadeVal = jade.optInt("value", 0);
-                        jadeStr = "- Jade: " + jadeVal;
+                        jadeVal = jade.optInt("value", 0);
                     }
                 }
             }
 
-            return "📊 Прогресс:\n" +
-                    "- DailyActivity: " + dailyVal + "/" + dailyTotal + "\n" +
-                    creditStr + "\n" +
-                    jadeStr;
+            return new ProgressInfo(dailyVal, dailyTotal, creditVal, jadeVal);
+
         } catch (Exception e) {
-            return "⚠️ Не удалось прочитать прогресс";
+            return new ProgressInfo(0, 0, 0, 0);
         }
     }
+
 }

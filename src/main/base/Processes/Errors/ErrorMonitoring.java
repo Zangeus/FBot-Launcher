@@ -26,8 +26,11 @@ import static Utils.FindButtonAndPress.findAndClickWithMessage;
 public class ErrorMonitoring {
     private static final Set<String> reportedErrors = ConcurrentHashMap.newKeySet();
     private static final BlockingQueue<ErrorSeverity> errorQueue = new LinkedBlockingQueue<>();
+
     private static String ERROR_DIR;
     private static String MAIN_LOG_DIR;
+    private static List<String> FAILURE_MESSAGES;
+
     private static ExecutorService executor;
     private static final ExecutorService singleExecutor = Executors.newSingleThreadExecutor();
     private static volatile boolean running = false;
@@ -53,6 +56,7 @@ public class ErrorMonitoring {
         String basePath = config.getStarRailCopilotPath();
         ERROR_DIR = basePath + "/log/error";
         MAIN_LOG_DIR = basePath + "/log";
+        FAILURE_MESSAGES = config.getFailureMessages();
     }
 
     public static synchronized void stop() {
@@ -331,10 +335,8 @@ public class ErrorMonitoring {
             TelegramBotSender.sendText("⚠ Очередь ошибок переполнена (SILENCE TIMEOUT)");
         }
 
-        LauncherConfig cfg = ConfigManager.loadConfig();
-        List<String> pool = cfg.getFailureMessages();
-        if (!pool.isEmpty()) {
-            TelegramBotSender.sendRandomMessage(pool);
+        if (!FAILURE_MESSAGES.isEmpty()) {
+            TelegramBotSender.sendRandomMessage(FAILURE_MESSAGES);
         }
     }
 

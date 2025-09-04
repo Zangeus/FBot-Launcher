@@ -10,6 +10,7 @@ import Processes.StartIsHere;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static Waiters.TelegramBotSender.sendRandomMessage;
@@ -17,6 +18,10 @@ import static Waiters.TelegramBotSender.sendRandomMessage;
 public class Main {
     private static final String LOCK_FILE = "bot_sources/app.lock";
     private static final LauncherConfig config = ConfigManager.loadConfig();
+
+    private static final List<String> SUCCESS_MESSAGES = config.getSuccessMessages();
+    private static final List<String> REPORT_MESSAGES = config.getReportMessages();
+
     private static volatile boolean isRunning = true;
     private static boolean done = false;
     private static boolean fatalExit = false;
@@ -72,10 +77,11 @@ public class Main {
                     if (isSURun) {
                         completeSU();
                     } else {
-                        sendRandomMessage(config.getSuccessMessages());
+                        System.out.println("MAIN 75 DEBUG");
+                        sendRandomMessage(SUCCESS_MESSAGES);
                     }
                 } else {
-                    sendRandomMessage(config.getFailureMessages());
+                    sendRandomMessage(REPORT_MESSAGES);
                 }
             }
 
@@ -130,7 +136,7 @@ public class Main {
 
     private static void restart() {
         CloseProcess.closeAll();
-        sendRandomMessage(config.getReportMessages());
+        sendRandomMessage(REPORT_MESSAGES);
     }
 
     private static void sleepOneSecond() {

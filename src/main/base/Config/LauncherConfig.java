@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Random;
 
 @Data
 public class LauncherConfig {
@@ -50,6 +51,13 @@ public class LauncherConfig {
     public List<String> getReportMessages() {
         if (!isReportNotification() || reportMessages == null) reportMessages = new ArrayList<>();
         return reportMessages;
+    }
+
+    public static String getRandomMessage(List<String> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return ConfigManager.loadConfig().isDebugMode() ? "Нет доступных сообщений в конфигурации" : "";
+        }
+        return messages.get(new Random().nextInt(messages.size()));
     }
 
     @Override

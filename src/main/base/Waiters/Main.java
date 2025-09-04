@@ -76,8 +76,6 @@ public class Main {
                 if (done) {
                     if (isSURun) {
                         completeSU();
-                    } else {
-                        sendRandomMessage(SUCCESS_MESSAGES);
                     }
                 } else {
                     sendRandomMessage(REPORT_MESSAGES);
@@ -174,7 +172,7 @@ public class Main {
             File lockFile = new File(LOCK_FILE);
 
             if (lockFile.exists()) {
-                return false; // можно добавить проверку PID
+                return false;
             }
 
             if (!lockFile.createNewFile()) {

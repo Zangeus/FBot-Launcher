@@ -89,8 +89,15 @@ public class EndWatcher {
                 if (!ts.equals(lastEventTime)) {
                     lastEventTime = ts;
 
-                    if (notifyOnSuccess)
-                        TelegramBotSender.sendText(readProgressFromJson().toString());
+                    String successMessage = LauncherConfig.getRandomMessage(
+                            ConfigManager.loadConfig().getSuccessMessages());
+
+                    if (notifyOnSuccess) {
+                        String msg = KaomojiHelper.randomKaomoji() + " " +
+                                successMessage + "\n" + readProgressFromJson();
+                        TelegramBotSender.sendText(msg);
+                    }
+
                 }
             }
         }

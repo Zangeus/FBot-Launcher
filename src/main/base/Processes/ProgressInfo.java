@@ -18,8 +18,7 @@ public class ProgressInfo {
 
     @Override
     public String toString() {
-        return "\uD83D\uDCDC Стата:\n" +
-                "- Ежедневки: " + dailyValue + "/" + dailyTotal + "\n" +
+        return  "- Ежедневки: " + dailyValue + "/" + dailyTotal + "\n" +
                 "- Кредиты: " + credit + "\n" +
                 "- Нефрит: " + jade;
     }

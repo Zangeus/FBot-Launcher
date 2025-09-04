@@ -35,7 +35,9 @@ public class Main {
             maxAttempts = 999;
             isSURun = true;
             Utils.ConfigJson.setWeeklyFarming(true);
-        } else Utils.ConfigJson.setWeeklyFarming(false);
+        } else {
+            Utils.ConfigJson.setWeeklyFarming(false);
+        }
 
         try {
             ErrorMonitoring.initFromConfig(config);
@@ -57,43 +59,9 @@ public class Main {
                 }
                 System.out.println("--- End searching ---");
 
-                while (isRunning) {
-                    if (EndWatcher.isStoppedSuccessfully()) {
-                        if (config.isSU_Monitoring() &&
-                                Utils.ConfigJson.isSUCompletedThisWeek()) {
-                            done = true;
-                            break;
-                        }
-                    }
+                runMainLoop();
 
-                    ErrorSeverity severity = ErrorMonitoring.waitForError(timeoutSeconds);
-                    if (severity != null) {
-                        switch (severity) {
-                            case ROGUE_FAILED_3_TIMES:
-                                System.out.println("\uD83D\uDD04 Перезаходим в виртуалку");
-                                continue;
-
-                            case RECOVERABLE:
-                                System.out.println("\uD83D\uDD04 Перезапускаемся...");
-                                restart();
-                                break;
-
-                            case FATAL:
-                                System.out.println("❌ Фатальная ошибка → аварийное завершение");
-                                fatalExit = true;
-                                isRunning = false;
-                                done = false;
-                                return;
-                        }
-                    }
-
-
-                    sleepOneSecond();
-                }
-
-                if (done) {
-                    break;
-                }
+                if (done || fatalExit) break;
             }
         } finally {
             ErrorMonitoring.stop();
@@ -101,15 +69,66 @@ public class Main {
 
             if (!fatalExit) {
                 if (done) {
-                    if (isSURun)
+                    if (isSURun) {
                         completeSU();
-                    else sendRandomMessage(config.getSuccessMessages());
+                    } else {
+                        sendRandomMessage(config.getSuccessMessages());
+                    }
+                } else {
+                    sendRandomMessage(config.getFailureMessages());
                 }
-                else sendRandomMessage(config.getFailureMessages());
             }
+
             performEmergencyShutdown();
             performFinalCleanup();
         }
+    }
+
+    private static void runMainLoop() {
+        while (isRunning) {
+            if (EndWatcher.isStoppedSuccessfully()) {
+                if (config.isSU_Monitoring()) {
+                    if (Utils.ConfigJson.isSUCompletedThisWeek()) {
+                        stopGracefully();
+                    }
+                } else {
+                    stopGracefully();
+                }
+                return;
+            }
+
+            ErrorSeverity severity = ErrorMonitoring.waitForError(timeoutSeconds);
+            if (severity != null) {
+                handleError(severity);
+            }
+
+            sleepOneSecond();
+        }
+    }
+
+    private static void handleError(ErrorSeverity severity) {
+        switch (severity) {
+            case ROGUE_FAILED_3_TIMES:
+                System.out.println("\uD83D\uDD04 Перезаходим в виртуалку");
+                break;
+
+            case RECOVERABLE:
+                System.out.println("\uD83D\uDD04 Перезапускаемся...");
+                restart();
+                break;
+
+            case FATAL:
+                System.out.println("❌ Фатальная ошибка → аварийное завершение");
+                fatalExit = true;
+                isRunning = false;
+                done = false;
+                break;
+        }
+    }
+
+    private static void stopGracefully() {
+        done = true;
+        isRunning = false;
     }
 
     private static void restart() {
@@ -153,7 +172,7 @@ public class Main {
             File lockFile = new File(LOCK_FILE);
 
             if (lockFile.exists()) {
-                return false; // или добавить проверку PID
+                return false; // можно добавить проверку PID
             }
 
             if (!lockFile.createNewFile()) {

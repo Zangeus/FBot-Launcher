@@ -39,6 +39,7 @@ public class Notifier {
                 message.append("- Приложение 'src' активно\n");
                 for (WinDef.HWND hwnd : srcWindows) {
                     WindowUtils.focusWindow(hwnd);
+                    Thread.sleep(500);
                     byte[] screenshot = WindowUtils.captureWindowScreenshot(hwnd);
                     TelegramBotSender.sendPhoto(screenshot, "Скриншот окна: src");
                 }
@@ -56,6 +57,7 @@ public class Notifier {
                 message.append("- Эмулятор активен\n");
                 for (WinDef.HWND hwnd : emulatorWindows) {
                     WindowUtils.focusWindow(hwnd);
+                    Thread.sleep(500);
                     byte[] screenshot = WindowUtils.captureWindowScreenshot(hwnd);
                     TelegramBotSender.sendPhoto(screenshot, "Скриншот окна: эмулятор");
                 }

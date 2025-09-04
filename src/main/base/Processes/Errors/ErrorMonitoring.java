@@ -329,7 +329,7 @@ public class ErrorMonitoring {
             try {
                 long now = System.currentTimeMillis();
                 if (now - lastLogTime > LOG_TIMEOUT_MS) {
-                    System.out.println("[DEBUG] Проверка тишины: lastLogTime=" + new Date(lastLogTime));
+                    //System.out.println("[DEBUG] Проверка тишины: lastLogTime=" + new Date(lastLogTime));
 
                     handleSilenceTimeout();
                     lastLogTime = now;
@@ -337,7 +337,7 @@ public class ErrorMonitoring {
             } catch (Exception e) {
                 System.err.println("Ошибка в monitorSilence: " + e.getMessage());
             }
-        }, 1, 1, TimeUnit.MINUTES); // старт через 1 мин, потом каждые 1 мин
+        }, 1, 1, TimeUnit.MINUTES);
     }
 
     private static void stopSilenceMonitor() {

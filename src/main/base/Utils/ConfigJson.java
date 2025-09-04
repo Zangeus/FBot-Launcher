@@ -1,5 +1,6 @@
 package Utils;
 
+import Config.ConfigManager;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
@@ -12,7 +13,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 public final class ConfigJson {
-    private static final Path CONFIG_PATH = Paths.get("Q:/Z-folder/Bot_time/StarRailCopilot/config/src.json");
+    private static final Path CONFIG_PATH =
+            Paths.get(ConfigManager.loadConfig().getStarRailCopilotPath() + "/config/src.json");
 
     private ConfigJson() {}
 
@@ -57,19 +59,25 @@ public final class ConfigJson {
     public static boolean isSUCompletedThisWeek() {
         try (FileReader reader = new FileReader(String.valueOf(CONFIG_PATH))) {
             JSONObject root = new JSONObject(new JSONTokener(reader));
-            JSONObject su = root.getJSONObject("RogueWorld")
-                    .getJSONObject("SimulatedUniverseFarm");
 
-            int total = su.getInt("total");
-            int value = su.getInt("value");
+            JSONObject rogue = root.optJSONObject("Rogue");
+            if (rogue == null) return false;
+
+            JSONObject rogueWorld = rogue.optJSONObject("RogueWorld");
+            if (rogueWorld == null) return false;
+
+            JSONObject su = rogueWorld.optJSONObject("SimulatedUniverseFarm");
+            if (su == null) return false;
+
+            int total = su.optInt("total", 0);
+            int value = su.optInt("value", 0);
             String timeStr = su.optString("time", null);
 
-            if (timeStr == null) return false;
+            if (timeStr == null || total == 0) return false;
 
             LocalDateTime suTime = LocalDateTime.parse(timeStr, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
             LocalDate suDate = suTime.toLocalDate();
 
-            // вычисляем понедельник и воскресенье текущей недели
             LocalDate today = LocalDate.now();
             LocalDate monday = today.with(DayOfWeek.MONDAY);
             LocalDate sunday = today.with(DayOfWeek.SUNDAY);
@@ -80,5 +88,6 @@ public final class ConfigJson {
             return false;
         }
     }
+
 
 }

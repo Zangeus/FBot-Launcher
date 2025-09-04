@@ -38,17 +38,17 @@ public class LauncherConfig {
     private boolean SU_Monitoring = true;
 
     public List<String> getSuccessMessages() {
-        if (successMessages == null) successMessages = new ArrayList<>();
+        if (!isSuccessNotification() || successMessages == null) successMessages = new ArrayList<>();
         return successMessages;
     }
 
     public List<String> getFailureMessages() {
-        if (failureMessages == null) failureMessages = new ArrayList<>();
+        if (!isFailureNotification() || failureMessages == null) failureMessages = new ArrayList<>();
         return failureMessages;
     }
 
     public List<String> getReportMessages() {
-        if (reportMessages == null) reportMessages = new ArrayList<>();
+        if (!isReportNotification() || reportMessages == null) reportMessages = new ArrayList<>();
         return reportMessages;
     }
 

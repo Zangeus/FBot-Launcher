@@ -1,5 +1,6 @@
 package Processes.Errors;
 
+import Config.ConfigManager;
 import Config.LauncherConfig;
 import Utils.ClickByCoords;
 import Utils.Notifier;
@@ -13,6 +14,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.*;
 import java.util.stream.Stream;
 
@@ -29,14 +31,19 @@ public class ErrorMonitoring {
     private static final ExecutorService singleExecutor = Executors.newSingleThreadExecutor();
     private static volatile boolean running = false;
 
+    private static volatile long lastLogTime = System.currentTimeMillis();
+    private static final long LOG_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(5);
+    private static ScheduledExecutorService silenceExecutor;
+
     public static synchronized void startAsync() {
         stop();
 
         running = true;
-        executor = Executors.newFixedThreadPool(2);
+        executor = Executors.newFixedThreadPool(3);
 
         executor.submit(() -> monitorErrorDir(ERROR_DIR));
         executor.submit(ErrorMonitoring::monitorMainLogs);
+        startSilenceMonitor();
 
         System.out.println("▶ ErrorMonitoring запущен для: " + ERROR_DIR + " и " + MAIN_LOG_DIR);
     }
@@ -53,6 +60,7 @@ public class ErrorMonitoring {
             executor.shutdownNow();
             executor = null;
         }
+        stopSilenceMonitor();
     }
 
     public static ErrorSeverity waitForError(int timeoutSeconds) {
@@ -174,6 +182,9 @@ public class ErrorMonitoring {
                     public void handle(String line) {
                         if (!running) return;
 
+                        // обновляем время активности
+                        lastLogTime = System.currentTimeMillis();
+
                         if (recentLines.size() >= 10) {
                             recentLines.removeFirst();
                         }
@@ -242,6 +253,45 @@ public class ErrorMonitoring {
                 .get();
 
         tailer.run();
+    }
+
+    // ─── Монитор тишины ───────────────────────────────
+    private static void startSilenceMonitor() {
+        silenceExecutor = Executors.newSingleThreadScheduledExecutor();
+        silenceExecutor.scheduleAtFixedRate(() -> {
+            try {
+                long now = System.currentTimeMillis();
+                if (now - lastLogTime > LOG_TIMEOUT_MS) {
+                    handleSilenceTimeout();
+                    lastLogTime = now;
+                }
+            } catch (Exception e) {
+                System.err.println("Ошибка в monitorSilence: " + e.getMessage());
+            }
+        }, 1, 1, TimeUnit.MINUTES); // старт через 1 мин, потом каждые 1 мин
+    }
+
+    private static void stopSilenceMonitor() {
+        if (silenceExecutor != null && !silenceExecutor.isShutdown()) {
+            silenceExecutor.shutdownNow();
+            silenceExecutor = null;
+        }
+    }
+
+    private static void handleSilenceTimeout() {
+        String msg = "⚠ В лог не писалось более 5 минут!";
+        Notifier.notifyFailure(msg);
+
+        boolean offered = errorQueue.offer(ErrorSeverity.FATAL);
+        if (!offered) {
+            TelegramBotSender.sendText("⚠ Очередь ошибок переполнена (SILENCE TIMEOUT)");
+        }
+
+        LauncherConfig cfg = ConfigManager.loadConfig();
+        List<String> pool = cfg.getFailureMessages();
+        if (!pool.isEmpty()) {
+            TelegramBotSender.sendRandomMessage(pool);
+        }
     }
 
     // ─── reenterIntoSU ───────────────────────────────

@@ -56,7 +56,6 @@ public class Main {
                 System.out.println("--- End searching ---");
 
                 while (isRunning) {
-                    // --- Проверка на завершение ---
                     if (EndWatcher.isStoppedSuccessfully()) {
                         if (config.isSU_Monitoring() &&
                                 Utils.ConfigJson.isSUCompletedThisWeek()) {
@@ -102,11 +101,9 @@ public class Main {
                 if (done) {
                     if (isSURun)
                         completeSU();
-                    else if (config.isSuccessNotification())
-                        sendRandomMessage(config.getSuccessMessages());
+                    else sendRandomMessage(config.getSuccessMessages());
                 }
-                else if (config.isFailureNotification())
-                        sendRandomMessage(config.getFailureMessages());
+                else sendRandomMessage(config.getFailureMessages());
             }
             performEmergencyShutdown();
             performFinalCleanup();

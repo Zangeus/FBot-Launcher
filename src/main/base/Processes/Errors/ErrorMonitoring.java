@@ -280,7 +280,7 @@ public class ErrorMonitoring {
                                 break;
 
                             case FATAL:
-                                Notifier.notifyFailure("❌ Фатальная ошибка:\n\n" + errorMsg);
+                                Notifier.notifyFailure("(ノ_<。) "+ FAILURE_MESSAGES +"\n\n" + errorMsg);
                                 offered = errorQueue.offer(ErrorSeverity.FATAL, 2, TimeUnit.SECONDS);
                                 if (!offered) {
                                     TelegramBotSender.sendText("⚠ Очередь ошибок переполнена (FATAL)");

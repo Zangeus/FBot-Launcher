@@ -77,7 +77,6 @@ public class Main {
                     if (isSURun) {
                         completeSU();
                     } else {
-                        System.out.println("MAIN 75 DEBUG");
                         sendRandomMessage(SUCCESS_MESSAGES);
                     }
                 } else {

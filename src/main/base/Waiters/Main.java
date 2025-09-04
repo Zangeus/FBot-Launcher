@@ -191,8 +191,9 @@ public class Main {
     public static void completeSU() {
         Utils.ConfigJson.setWeeklyFarming(false);
 
-        TelegramBotSender.sendLocalPhoto("bot_sources/SU.png");
-        TelegramBotSender.sendText("Исследование Виртуальной вселенной завершено");
+        TelegramBotSender.send(
+                new File(config.getPicsToStartPath() + "/SU.png")
+                ,"Исследование Виртуальной вселенной завершено");
 
         config.setSU_Monitoring(false);
         ConfigManager.saveConfig(config);

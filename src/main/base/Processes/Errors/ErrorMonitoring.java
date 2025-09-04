@@ -16,6 +16,7 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static Utils.ClickByCoords.activateAndClick;
@@ -161,15 +162,55 @@ public class ErrorMonitoring {
     }
 
     private static File findLatestSrcLog() throws IOException {
+        long now = System.currentTimeMillis();
+        long freshnessLimit = TimeUnit.HOURS.toMillis(1); // свежие ≤ 1 часа
+
         try (Stream<Path> files = Files.list(Paths.get(MAIN_LOG_DIR))) {
-            return files.filter(p -> p.getFileName().toString().endsWith("_src.txt"))
+            List<File> logs = files
+                    .filter(p -> p.getFileName().toString().endsWith("_src.txt"))
                     .map(Path::toFile)
-                    .max(Comparator.comparingLong(File::lastModified))
-                    .orElse(null);
+                    .collect(Collectors.toList()); // ✅ вместо .toList()
+
+            if (logs.isEmpty()) {
+                System.err.println("❌ В папке " + MAIN_LOG_DIR + " не найдено ни одного *_src.txt");
+                return null;
+            }
+
+            System.out.println("▶ Найдены src-логи:");
+            for (File f : logs) {
+                System.out.printf("   - %s | modified=%s | size=%d bytes%n",
+                        f.getName(),
+                        new Date(f.lastModified()),
+                        f.length());
+            }
+
+            // фильтруем свежие
+            List<File> freshLogs = logs.stream()
+                    .filter(f -> now - f.lastModified() <= freshnessLimit)
+                    .collect(Collectors.toList()); // ✅ вместо .toList()
+
+            File latest;
+            if (!freshLogs.isEmpty()) {
+                latest = freshLogs.stream()
+                        .max(Comparator.comparingLong(File::lastModified))
+                        .orElse(null);
+                System.out.println("▶ Выбран свежий src-лог: " + latest.getName());
+            } else {
+                latest = logs.stream()
+                        .max(Comparator.comparingLong(File::lastModified))
+                        .orElse(null);
+                if (latest != null) {
+                    System.out.println("⚠ Нет свежих логов. Используем самый новый из старых: " + latest.getName());
+                }
+            }
+
+            return latest;
         }
     }
 
     private static void tailFile(File logFile) {
+        System.out.println("▶ Tailer запущен для: " + logFile.getAbsolutePath());
+
         Tailer tailer = Tailer.builder()
                 .setFile(logFile)
                 .setDelayDuration(java.time.Duration.ofSeconds(1))
@@ -181,6 +222,7 @@ public class ErrorMonitoring {
                     @Override
                     public void handle(String line) {
                         if (!running) return;
+                        System.out.println("[DEBUG] Новая строка: " + line);
 
                         // обновляем время активности
                         lastLogTime = System.currentTimeMillis();
@@ -262,6 +304,8 @@ public class ErrorMonitoring {
             try {
                 long now = System.currentTimeMillis();
                 if (now - lastLogTime > LOG_TIMEOUT_MS) {
+                    System.out.println("[DEBUG] Проверка тишины: lastLogTime=" + new Date(lastLogTime));
+
                     handleSilenceTimeout();
                     lastLogTime = now;
                 }

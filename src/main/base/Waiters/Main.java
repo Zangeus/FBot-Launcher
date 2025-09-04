@@ -108,9 +108,6 @@ public class Main {
 
     private static void handleError(ErrorSeverity severity) {
         switch (severity) {
-            case ROGUE_FAILED_3_TIMES:
-                System.out.println("\uD83D\uDD04 Перезаходим в виртуалку");
-                break;
 
             case RECOVERABLE:
                 System.out.println("\uD83D\uDD04 Перезапускаемся...");

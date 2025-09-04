@@ -2,6 +2,8 @@ package Waiters;
 
 import Config.ConfigManager;
 import Config.LauncherConfig;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.io.*;
 import java.net.HttpURLConnection;
@@ -19,6 +21,62 @@ public class TelegramBotSender {
     private static final String API_URL = "https://api.telegram.org/bot";
     private static final LauncherConfig config = ConfigManager.loadConfig();
     private static final Random random = new Random();
+
+    public static void sendAlbum(String caption, File... photos) {
+        try {
+            String urlString = "https://api.telegram.org/bot" + config.getBotToken() + "/sendMediaGroup";
+            URL url = new URL(urlString);
+            String boundary = "----" + System.currentTimeMillis();
+
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+            JSONArray media = new JSONArray();
+            for (int i = 0; i < photos.length; i++) {
+                JSONObject obj = new JSONObject();
+                obj.put("type", "photo");
+                obj.put("media", "attach://photo" + i);
+                if (i == 0) {
+                    obj.put("caption", caption);
+                }
+                media.put(obj);
+            }
+
+            try (OutputStream os = conn.getOutputStream()) {
+                // media JSON
+                String mediaJson = "--" + boundary + "\r\n" +
+                        "Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n" +
+                        config.getChatId() + "\r\n" +
+                        "--" + boundary + "\r\n" +
+                        "Content-Disposition: form-data; name=\"media\"\r\n\r\n" +
+                        media.toString() + "\r\n";
+
+                os.write(mediaJson.getBytes());
+
+                // attach files
+                for (int i = 0; i < photos.length; i++) {
+                    String fieldName = "photo" + i;
+                    String header = "--" + boundary + "\r\n" +
+                            "Content-Disposition: form-data; name=\"" + fieldName + "\"; filename=\"" + photos[i].getName() + "\"\r\n" +
+                            "Content-Type: application/octet-stream\r\n\r\n";
+                    os.write(header.getBytes());
+                    Files.copy(photos[i].toPath(), os);
+                    os.write("\r\n".getBytes());
+                }
+
+
+                os.write(("--" + boundary + "--\r\n").getBytes());
+            }
+
+            int responseCode = conn.getResponseCode();
+            System.out.println("Telegram album send response: " + responseCode);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
     // Пул потоков для асинхронных задач
     private static final ExecutorService executor = Executors.newCachedThreadPool();

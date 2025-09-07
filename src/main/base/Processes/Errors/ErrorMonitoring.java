@@ -41,7 +41,8 @@ public class ErrorMonitoring {
     private static volatile boolean running = false;
 
     private static volatile long lastLogTime = System.currentTimeMillis();
-    private static final long LOG_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(5);
+    //монитор тишины
+    private static final long LOG_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(1);
     private static ScheduledExecutorService silenceExecutor;
 
     public static synchronized void startAsync() {
@@ -358,10 +359,6 @@ public class ErrorMonitoring {
         boolean offered = errorQueue.offer(ErrorSeverity.FATAL);
         if (!offered && NOTIFY_ON_FAIL) {
             Notifier.notifyFailure("⚠ Очередь ошибок переполнена (SILENCE TIMEOUT)");
-        }
-
-        if (!FAILURE_MESSAGE.isEmpty()) {
-            Notifier.notifyFailure(FAILURE_MESSAGE);
         }
     }
 

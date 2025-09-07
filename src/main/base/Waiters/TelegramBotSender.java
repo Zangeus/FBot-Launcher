@@ -23,60 +23,74 @@ public class TelegramBotSender {
     private static final Random random = new Random();
 
     public static void sendAlbum(String caption, File... photos) {
+        if (photos == null || photos.length == 0) return;
+
         try {
             String urlString = "https://api.telegram.org/bot" + config.getBotToken() + "/sendMediaGroup";
             URL url = new URL(urlString);
-            String boundary = "----" + System.currentTimeMillis();
+            String boundary = "----Boundary" + System.currentTimeMillis();
 
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setDoOutput(true);
             conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
 
+            // JSON media
             JSONArray media = new JSONArray();
             for (int i = 0; i < photos.length; i++) {
                 JSONObject obj = new JSONObject();
                 obj.put("type", "photo");
                 obj.put("media", "attach://photo" + i);
-                if (i == 0) {
-                    obj.put("caption", caption);
-                }
+                if (i == 0 && caption != null && !caption.isBlank()) obj.put("caption", caption);
                 media.put(obj);
             }
 
-            try (OutputStream os = conn.getOutputStream()) {
-                // media JSON
-                String mediaJson = "--" + boundary + "\r\n" +
-                        "Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n" +
-                        config.getChatId() + "\r\n" +
-                        "--" + boundary + "\r\n" +
-                        "Content-Disposition: form-data; name=\"media\"\r\n\r\n" +
-                        media.toString() + "\r\n";
+            try (OutputStream os = conn.getOutputStream();
+                 PrintWriter writer = new PrintWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8), true)) {
 
-                os.write(mediaJson.getBytes());
+                // chat_id
+                writer.append("--").append(boundary).append("\r\n")
+                        .append("Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n")
+                        .append(config.getChatId()).append("\r\n");
 
-                // attach files
+                // media
+                writer.append("--").append(boundary).append("\r\n")
+                        .append("Content-Disposition: form-data; name=\"media\"\r\n\r\n")
+                        .append(media.toString()).append("\r\n");
+
+                // файлы
                 for (int i = 0; i < photos.length; i++) {
-                    String fieldName = "photo" + i;
-                    String header = "--" + boundary + "\r\n" +
-                            "Content-Disposition: form-data; name=\"" + fieldName + "\"; filename=\"" + photos[i].getName() + "\"\r\n" +
-                            "Content-Type: application/octet-stream\r\n\r\n";
-                    os.write(header.getBytes());
+                    writer.append("--").append(boundary).append("\r\n")
+                            .append("Content-Disposition: form-data; name=\"photo").append(String.valueOf(i))
+                            .append("\"; filename=\"").append(photos[i].getName()).append("\"\r\n")
+                            .append("Content-Type: image/png\r\n\r\n").flush();
+
                     Files.copy(photos[i].toPath(), os);
-                    os.write("\r\n".getBytes());
+                    os.flush();
+                    writer.append("\r\n").flush();
                 }
 
-
-                os.write(("--" + boundary + "--\r\n").getBytes());
+                // конец
+                writer.append("--").append(boundary).append("--\r\n").flush();
             }
 
             int responseCode = conn.getResponseCode();
             System.out.println("Telegram album send response: " + responseCode);
 
+            if (responseCode != 200) {
+                try (InputStream err = conn.getErrorStream()) {
+                    if (err != null) {
+                        String errorMsg = new String(err.readAllBytes(), StandardCharsets.UTF_8);
+                        System.err.println("Ошибка ответа Telegram API: " + errorMsg);
+                    }
+                }
+            }
+
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
+
 
     // Пул потоков для асинхронных задач
     private static final ExecutorService executor = Executors.newCachedThreadPool();

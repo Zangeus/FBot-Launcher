@@ -3,6 +3,7 @@ package Processes.Errors;
 import Config.LauncherConfig;
 import Utils.ClickByCoords;
 import Utils.Notifier;
+import lombok.Getter;
 import org.apache.commons.io.input.Tailer;
 import org.apache.commons.io.input.TailerListenerAdapter;
 
@@ -26,6 +27,8 @@ public class ErrorMonitoring {
     private static final BlockingQueue<ErrorSeverity> errorQueue = new LinkedBlockingQueue<>();
     private static final long START_IGNORE_MS = TimeUnit.SECONDS.toMillis(10); // 10 секунд игнор в начале запуска
     private static long startTime = System.currentTimeMillis();
+    @Getter
+    private static volatile File currentLog;
 
     private static String ERROR_DIR;
     private static String MAIN_LOG_DIR;
@@ -146,7 +149,7 @@ public class ErrorMonitoring {
         try (WatchService watcher = FileSystems.getDefault().newWatchService()) {
             dir.register(watcher, StandardWatchEventKinds.ENTRY_CREATE);
 
-            File currentLog = findLatestSrcLog();
+            currentLog = findLatestSrcLog();
             if (currentLog == null) {
                 System.err.println("Не найден *_src.txt в " + dir);
                 return;
@@ -327,7 +330,7 @@ public class ErrorMonitoring {
         silenceExecutor.scheduleAtFixedRate(() -> {
             try {
                 long now = System.currentTimeMillis();
-                System.out.println("[DEBUG] CHECKED FOR: "+ new Date(now) +"\n[CURRENT DIF] "+ now);
+                System.out.println("[DEBUG] CHECKED FOR: "+ new Date(now) +"\n[CURRENT DIF] " + (now - lastLogTime) + "sec");
                 if (now - lastLogTime > LOG_TIMEOUT_MS) {
                     System.out.println("[DEBUG] Проверка тишины: lastLogTime=" + new Date(lastLogTime));
 
@@ -348,7 +351,7 @@ public class ErrorMonitoring {
     }
 
     private static void handleSilenceTimeout() {
-        String msg = "⚠ В лог не писалось более 5 минут!";
+        String msg = "Первопричинность: В лог не писалось более 5 минут!";
         if (NOTIFY_ON_FAIL)
             Notifier.notifyFailure(msg);
 

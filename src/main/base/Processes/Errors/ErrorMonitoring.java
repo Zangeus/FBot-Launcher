@@ -42,7 +42,7 @@ public class ErrorMonitoring {
 
     private static volatile long lastLogTime = System.currentTimeMillis();
     //монитор тишины
-    private static final long LOG_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(1);
+    private static final long LOG_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(5);
     private static ScheduledExecutorService silenceExecutor;
 
     public static synchronized void startAsync() {

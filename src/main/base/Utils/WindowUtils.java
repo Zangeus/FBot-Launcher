@@ -7,6 +7,11 @@ import com.sun.jna.platform.win32.WinDef.HWND;
 import com.sun.jna.ptr.IntByReference;
 
 import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.Transferable;
+import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -126,4 +131,44 @@ public class WindowUtils {
             return new byte[0];
         }
     }
+
+    public static byte[] captureWindowAltPrintScreen(WinDef.HWND hwnd) {
+        try {
+            if (hwnd == null) return null;
+
+            // Фокусируем окно
+            WindowUtils.focusWindow(hwnd);
+
+            Robot robot = new Robot();
+
+            // Alt + PrintScreen
+            robot.keyPress(KeyEvent.VK_ALT);
+            robot.keyPress(KeyEvent.VK_PRINTSCREEN);
+            robot.keyRelease(KeyEvent.VK_PRINTSCREEN);
+            robot.keyRelease(KeyEvent.VK_ALT);
+
+            Thread.sleep(200); // ждём буфер обмена
+
+            // Получаем картинку из буфера обмена
+            Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+            Transferable content = clipboard.getContents(null);
+            if (content != null && content.isDataFlavorSupported(DataFlavor.imageFlavor)) {
+                BufferedImage image = (BufferedImage) content.getTransferData(DataFlavor.imageFlavor);
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                ImageIO.write(image, "png", baos);
+                return baos.toByteArray();
+            } else {
+                System.err.println("Буфер обмена не содержит изображение");
+                return null;
+            }
+
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            return null;
+        }
+    }
+
+
+
+
 }

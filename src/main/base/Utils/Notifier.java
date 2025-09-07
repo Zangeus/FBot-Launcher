@@ -10,11 +10,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 
 public class Notifier {
-    // простой текст
     private static String prepareMessage(String message) {
         String randomMessage = LauncherConfig.getRandomMessage(
                 ConfigManager.loadConfig().getFailureMessages()
@@ -28,7 +26,6 @@ public class Notifier {
 
     private static File captureAndSave(String windowPart, String filename) {
         try {
-            // ищем окно
             List<WinDef.HWND> windows = WindowUtils.findWindowsByTitlePart(windowPart);
             if (windows.isEmpty()) {
                 System.out.println("[WARN] Окно не найдено: " + windowPart);
@@ -38,18 +35,15 @@ public class Notifier {
             WinDef.HWND hwnd = windows.get(0);
             System.out.println("[INFO] Нашли окно \"" + windowPart + "\" → " + hwnd);
 
-            // фокусируем окно (чтобы PrintWindow сработал надёжнее)
             WindowUtils.focusWindow(hwnd);
 
-            // пробуем сделать скриншот
-            byte[] screenshot = WindowUtils.captureWindowScreenshot(hwnd);
-            if (screenshot == null || screenshot.length == 0) {
-                System.out.println("[ERROR] Скриншот пустой для окна: " + windowPart);
+            byte[] screenshot = WindowUtils.captureWindowAltPrintScreen(hwnd);
+            if (screenshot.length == 0) {
+                TelegramBotSender.sendText("[ERROR] Скриншот пустой для окна: " + windowPart);
                 return null;
             }
             System.out.println("[INFO] Скриншот сделан (" + screenshot.length + " байт)");
 
-            // сохраняем во временный файл
             File outFile = new File(filename);
             try (FileOutputStream fos = new FileOutputStream(outFile)) {
                 fos.write(screenshot);
@@ -59,8 +53,7 @@ public class Notifier {
             return outFile;
 
         } catch (Exception e) {
-            System.out.println("[EXCEPTION] Ошибка при скриншоте окна \"" + windowPart + "\": " + e.getMessage());
-            e.printStackTrace();
+            TelegramBotSender.sendText("[EXCEPTION] Ошибка при скриншоте окна \"" + windowPart + "\": " + e.getMessage());
             return null;
         }
     }
@@ -73,31 +66,55 @@ public class Notifier {
         File srcScreenshot = captureAndSave("SRC", "src.png");
         File androidScreenshot = captureAndSave("Android Device", "android.png");
 
-        // Лог-файл
-        File logFile = ErrorMonitoring.getCurrentLog();
+        // Лог: последние 400 строк во временный файл
+        File tempLog = null;
+        try {
+            File logFile = ErrorMonitoring.getCurrentLog();
+            if (logFile != null && logFile.exists()) {
+                tempLog = LogUtils.getLastLines(logFile, 400);
+            }
 
-        // Отправляем альбом только со скриншотами
-        List<File> screenshots = new ArrayList<>();
-        if (srcScreenshot != null && srcScreenshot.exists() && srcScreenshot.length() > 0) {
-            screenshots.add(srcScreenshot);
-        }
-        if (androidScreenshot != null && androidScreenshot.exists() && androidScreenshot.length() > 0) {
-            screenshots.add(androidScreenshot);
-        }
+            // Собираем скриншоты и фильтруем только валидные
+            List<File> screenshots = new ArrayList<>();
+            if (isValidImage(srcScreenshot)) screenshots.add(srcScreenshot);
+            if (isValidImage(androidScreenshot)) screenshots.add(androidScreenshot);
 
-        if (!screenshots.isEmpty()) {
-            TelegramBotSender.sendAlbum(finalMessage, screenshots.toArray(new File[0]));
-        }
+            // Отправка скриншотов
+            if (screenshots.size() > 1) {
+                TelegramBotSender.sendAlbum(finalMessage, screenshots.toArray(new File[0]));
+            } else if (screenshots.size() == 1) {
+                TelegramBotSender.send(screenshots.get(0), finalMessage);
+            }
 
-        // Отправляем лог-файл отдельным сообщением, если он есть
-        if (logFile != null && logFile.exists() && logFile.length() > 0) {
-            TelegramBotSender.send(logFile, "Лог ошибки");
-        }
+            // Отправка лога отдельно
+            if (tempLog != null && tempLog.exists() && tempLog.length() > 0) {
+                TelegramBotSender.sendDocument(tempLog);
+            }
 
-        // Если ничего нет, просто отправляем текст
-        if (screenshots.isEmpty() && (logFile == null || !logFile.exists())) {
-            TelegramBotSender.sendText(finalMessage);
+            // Если вообще нет ни скринов, ни лога, просто текст
+            if (screenshots.isEmpty() && (tempLog == null || !tempLog.exists())) {
+                TelegramBotSender.sendText(finalMessage);
+            }
+
+        } catch (Exception e) {
+            TelegramBotSender.sendText(finalMessage + "\n(Ошибка при подготовке файлов: " + e.getMessage() + ")");
+        } finally {
+            if (tempLog != null && tempLog.exists() && !tempLog.delete()) {
+                System.err.println("⚠ Не удалось удалить временный файл: " + tempLog.getAbsolutePath());
+            }
+            if (srcScreenshot != null && srcScreenshot.exists() && !srcScreenshot.delete()) {
+                System.err.println("⚠ Не удалось удалить скриншот: " + srcScreenshot.getAbsolutePath());
+            }
+            if (androidScreenshot != null && androidScreenshot.exists() && !androidScreenshot.delete()) {
+                System.err.println("⚠ Не удалось удалить скриншот: " + androidScreenshot.getAbsolutePath());
+            }
         }
+    }
+
+    private static boolean isValidImage(File f) {
+        if (f == null || !f.exists() || f.length() == 0) return false;
+        String name = f.getName().toLowerCase();
+        return name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".gif");
     }
 
 
@@ -133,17 +150,14 @@ public class Notifier {
             }
         }
 
-        // Отправляем альбом с картинками
         if (!images.isEmpty()) {
             TelegramBotSender.sendAlbum(message, images.toArray(new File[0]));
         }
 
-        // Отправляем все остальные файлы как документы
         for (File f : otherFiles) {
             TelegramBotSender.send(f, "Файл из папки: " + f.getName());
         }
 
-        // Если вообще ничего не отправлено
         if (images.isEmpty() && otherFiles.isEmpty()) {
             TelegramBotSender.sendText(message + "\n(Нет валидных файлов для отправки)");
         }

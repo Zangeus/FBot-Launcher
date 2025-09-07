@@ -3,7 +3,6 @@ package Processes.Errors;
 import Config.LauncherConfig;
 import Utils.ClickByCoords;
 import Utils.Notifier;
-import Waiters.TelegramBotSender;
 import org.apache.commons.io.input.Tailer;
 import org.apache.commons.io.input.TailerListenerAdapter;
 
@@ -30,7 +29,7 @@ public class ErrorMonitoring {
 
     private static String ERROR_DIR;
     private static String MAIN_LOG_DIR;
-    private static List<String> FAILURE_MESSAGES;
+    private static String FAILURE_MESSAGE;
     private static boolean NOTIFY_ON_FAIL;
     private static boolean NOTIFY_ON_REPORT;
 
@@ -61,7 +60,7 @@ public class ErrorMonitoring {
         ERROR_DIR = basePath + "/log/error";
         MAIN_LOG_DIR = basePath + "/log";
 
-        FAILURE_MESSAGES = config.getFailureMessages();
+        FAILURE_MESSAGE = LauncherConfig.getRandomMessage(config.getFailureMessages());
         NOTIFY_ON_FAIL = config.isFailureNotification();
         NOTIFY_ON_REPORT = config.isReportNotification();
     }
@@ -187,13 +186,13 @@ public class ErrorMonitoring {
                 return null;
             }
 
-            System.out.println("▶ Найдены src-логи:");
-            for (File f : logs) {
-                System.out.printf("   - %s | modified=%s | size=%d bytes%n",
-                        f.getName(),
-                        new Date(f.lastModified()),
-                        f.length());
-            }
+//            System.out.println("▶ Найдены src-логи:");
+//            for (File f : logs) {
+//                System.out.printf("   - %s | modified=%s | size=%d bytes%n",
+//                        f.getName(),
+//                        new Date(f.lastModified()),
+//                        f.length());
+//            }
 
             // фильтруем свежие
             List<File> freshLogs = logs.stream()
@@ -259,7 +258,7 @@ public class ErrorMonitoring {
                                 flushError(buffer, severity);
                             } catch (InterruptedException e) {
                                 if (NOTIFY_ON_FAIL)
-                                    TelegramBotSender.sendText("Ошибка добавления в пул: " + e.getMessage());
+                                    Notifier.notifyFailure("Ошибка добавления в пул: " + e.getMessage());
                             }
                         }
                     }
@@ -278,7 +277,7 @@ public class ErrorMonitoring {
                                 singleExecutor.submit(ErrorMonitoring::reenterIntoSU);
                                 offered = errorQueue.offer(ErrorSeverity.ROGUE_FAILED_3_TIMES, 2, TimeUnit.SECONDS);
                                 if (!offered && NOTIFY_ON_FAIL) {
-                                    TelegramBotSender.sendText("⚠ Очередь ошибок переполнена (ROGUE_FAILED_3_TIMES)");
+                                    Notifier.notifyFailure("⚠ Очередь ошибок переполнена (ROGUE_FAILED_3_TIMES)");
                                 }
                                 break;
 
@@ -287,7 +286,7 @@ public class ErrorMonitoring {
                                     Notifier.notifyFailure("🔄 Перезапускаемся...\n\n" + errorMsg);
                                 offered = errorQueue.offer(ErrorSeverity.RECOVERABLE, 2, TimeUnit.SECONDS);
                                 if (!offered && NOTIFY_ON_FAIL) {
-                                    TelegramBotSender.sendText("⚠ Очередь ошибок переполнена (RECOVERABLE)");
+                                    Notifier.notifyFailure("⚠ Очередь ошибок переполнена (RECOVERABLE)");
                                 }
                                 break;
 
@@ -303,11 +302,11 @@ public class ErrorMonitoring {
                                 String face = kaomojis.get(new Random().nextInt(kaomojis.size()));
 
                                 if (NOTIFY_ON_FAIL)
-                                    Notifier.notifyFailure(face + " " + FAILURE_MESSAGES + "\n\n" + errorMsg);
+                                    Notifier.notifyFailure(face + " " + FAILURE_MESSAGE + "\n\n" + errorMsg);
 
                                 offered = errorQueue.offer(ErrorSeverity.FATAL, 2, TimeUnit.SECONDS);
                                 if (!offered && NOTIFY_ON_FAIL) {
-                                    TelegramBotSender.sendText("⚠ Очередь ошибок переполнена (FATAL)");
+                                    Notifier.notifyFailure("⚠ Очередь ошибок переполнена (FATAL)");
                                 }
                                 break;
                         }
@@ -328,8 +327,9 @@ public class ErrorMonitoring {
         silenceExecutor.scheduleAtFixedRate(() -> {
             try {
                 long now = System.currentTimeMillis();
+                System.out.println("[DEBUG] CHECKED FOR: "+ new Date(now) +"\n[CURRENT DIF] "+ now);
                 if (now - lastLogTime > LOG_TIMEOUT_MS) {
-                    //System.out.println("[DEBUG] Проверка тишины: lastLogTime=" + new Date(lastLogTime));
+                    System.out.println("[DEBUG] Проверка тишины: lastLogTime=" + new Date(lastLogTime));
 
                     handleSilenceTimeout();
                     lastLogTime = now;
@@ -354,11 +354,11 @@ public class ErrorMonitoring {
 
         boolean offered = errorQueue.offer(ErrorSeverity.FATAL);
         if (!offered && NOTIFY_ON_FAIL) {
-            TelegramBotSender.sendText("⚠ Очередь ошибок переполнена (SILENCE TIMEOUT)");
+            Notifier.notifyFailure("⚠ Очередь ошибок переполнена (SILENCE TIMEOUT)");
         }
 
-        if (!FAILURE_MESSAGES.isEmpty()) {
-            TelegramBotSender.sendRandomMessage(FAILURE_MESSAGES);
+        if (!FAILURE_MESSAGE.isEmpty()) {
+            Notifier.notifyFailure(FAILURE_MESSAGE);
         }
     }
 

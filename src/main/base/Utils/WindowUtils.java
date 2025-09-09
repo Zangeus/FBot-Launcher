@@ -1,10 +1,9 @@
 package Utils;
 
+import Waiters.TelegramBotSender;
 import com.sun.jna.Native;
-import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.*;
 import com.sun.jna.platform.win32.WinDef.HWND;
-import com.sun.jna.ptr.IntByReference;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -50,28 +49,6 @@ public class WindowUtils {
         }
     }
 
-    public static String getWindowTitleByPID(long pid) {
-        final StringBuilder windowTitle = new StringBuilder();
-
-        User32.INSTANCE.EnumWindows((HWND hWnd, Pointer data) -> {
-            IntByReference lpdwProcessId = new IntByReference();
-            User32.INSTANCE.GetWindowThreadProcessId(hWnd, lpdwProcessId);
-
-            if (lpdwProcessId.getValue() == (int) pid) {
-                char[] buffer = new char[1024];
-                User32.INSTANCE.GetWindowText(hWnd, buffer, 1024);
-                String title = Native.toString(buffer);
-                if (!title.isEmpty()) {
-                    windowTitle.append(title);
-                    return false; // нашли → стоп
-                }
-            }
-            return true;
-        }, null);
-
-        return windowTitle.toString();
-    }
-
     public static void closeWindowByTitle(String windowTitle) {
         User32 user32 = User32.INSTANCE;
 
@@ -84,64 +61,44 @@ public class WindowUtils {
         }
     }
 
-    public static byte[] captureWindowScreenshot(WinDef.HWND hwnd) {
-        WinDef.RECT rect = new WinDef.RECT();
-        User32.INSTANCE.GetWindowRect(hwnd, rect);
-        int width = rect.right - rect.left;
-        int height = rect.bottom - rect.top;
+    static byte[] captureWindowScreenshot(String windowPart) {
+        try {
+            List<WinDef.HWND> windows = WindowUtils.findWindowsByTitlePart(windowPart);
+            if (windows.isEmpty()) {
+                System.out.println("[WARN] Окно не найдено: " + windowPart);
+                return null;
+            }
 
-        WinDef.HDC windowDC = User32.INSTANCE.GetDC(hwnd);
-        WinDef.HDC memDC = GDI32.INSTANCE.CreateCompatibleDC(windowDC);
-        WinDef.HBITMAP outputBitmap = GDI32.INSTANCE.CreateCompatibleBitmap(windowDC, width, height);
+            WinDef.HWND hwnd = windows.get(0);
+            System.out.println("[INFO] Нашли окно \"" + windowPart + "\" → " + hwnd);
 
-        WinNT.HANDLE oldBitmap = GDI32.INSTANCE.SelectObject(memDC, outputBitmap);
-        User32.INSTANCE.PrintWindow(hwnd, memDC, 0);
+            BufferedImage img = captureWindowAltPrintScreen(hwnd);
+            if (img == null) return null;
 
-        WinGDI.BITMAPINFO bmi = new WinGDI.BITMAPINFO();
-        bmi.bmiHeader.biSize = bmi.bmiHeader.size();
-        bmi.bmiHeader.biWidth = width;
-        bmi.bmiHeader.biHeight = -height; // отрицательный => без переворота
-        bmi.bmiHeader.biPlanes = 1;
-        bmi.bmiHeader.biBitCount = 32;
-        bmi.bmiHeader.biCompression = WinGDI.BI_RGB;
+            return bufferedImageToPngBytes(img);
 
-        int bufferSize = width * height * 4;
-        com.sun.jna.Memory buffer = new com.sun.jna.Memory(bufferSize);
-
-        GDI32.INSTANCE.GetDIBits(memDC, outputBitmap, 0, height, buffer, bmi, WinGDI.DIB_RGB_COLORS);
-        int[] pixels = buffer.getIntArray(0, width * height);
-
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        image.setRGB(0, 0, width, height, pixels, 0, width);
-
-        GDI32.INSTANCE.SelectObject(memDC, oldBitmap);
-        GDI32.INSTANCE.DeleteObject(outputBitmap);
-        GDI32.INSTANCE.DeleteDC(memDC);
-        User32.INSTANCE.ReleaseDC(hwnd, windowDC);
-
-        return convertToByteArray(image);
-    }
-
-    private static byte[] convertToByteArray(BufferedImage image) {
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            ImageIO.write(image, "png", baos);
-            return baos.toByteArray();
-        } catch (IOException e) {
-            System.err.println("Ошибка конвертации скриншота окна: " + e.getMessage());
-            return new byte[0];
+        } catch (Exception e) {
+            TelegramBotSender.sendText("[EXCEPTION] Ошибка при скриншоте окна \"" + windowPart + "\": " + e.getMessage());
+            return null;
         }
     }
 
-    public static byte[] captureWindowAltPrintScreen(WinDef.HWND hwnd) {
+
+    public static byte[] bufferedImageToPngBytes(BufferedImage image) throws IOException {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            ImageIO.write(image, "png", baos);
+            return baos.toByteArray();
+        }
+    }
+
+    public static BufferedImage captureWindowAltPrintScreen(WinDef.HWND hwnd) {
         try {
             if (hwnd == null) return null;
 
-            // Фокусируем окно
             WindowUtils.focusWindow(hwnd);
 
             Robot robot = new Robot();
 
-            // Alt + PrintScreen
             robot.keyPress(KeyEvent.VK_ALT);
             robot.keyPress(KeyEvent.VK_PRINTSCREEN);
             robot.keyRelease(KeyEvent.VK_PRINTSCREEN);
@@ -149,14 +106,10 @@ public class WindowUtils {
 
             Thread.sleep(200); // ждём буфер обмена
 
-            // Получаем картинку из буфера обмена
             Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
             Transferable content = clipboard.getContents(null);
             if (content != null && content.isDataFlavorSupported(DataFlavor.imageFlavor)) {
-                BufferedImage image = (BufferedImage) content.getTransferData(DataFlavor.imageFlavor);
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                ImageIO.write(image, "png", baos);
-                return baos.toByteArray();
+                return (BufferedImage) content.getTransferData(DataFlavor.imageFlavor);
             } else {
                 System.err.println("Буфер обмена не содержит изображение");
                 return null;
@@ -167,8 +120,6 @@ public class WindowUtils {
             return null;
         }
     }
-
-
 
 
 }

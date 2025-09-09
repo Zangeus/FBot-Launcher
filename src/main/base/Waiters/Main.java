@@ -19,7 +19,6 @@ public class Main {
     private static final String LOCK_FILE = "bot_sources/app.lock";
     private static final LauncherConfig config = ConfigManager.loadConfig();
 
-    private static final List<String> SUCCESS_MESSAGES = config.getSuccessMessages();
     private static final List<String> REPORT_MESSAGES = config.getReportMessages();
 
     private static volatile boolean isRunning = true;

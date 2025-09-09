@@ -4,12 +4,12 @@ import Config.ConfigManager;
 import Config.LauncherConfig;
 import Processes.Errors.ErrorMonitoring;
 import Waiters.TelegramBotSender;
-import com.sun.jna.platform.win32.WinDef;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
+
+import static Utils.WindowUtils.captureWindowScreenshot;
 
 
 public class Notifier {
@@ -24,49 +24,16 @@ public class Notifier {
         }
     }
 
-    private static File captureAndSave(String windowPart, String filename) {
-        try {
-            List<WinDef.HWND> windows = WindowUtils.findWindowsByTitlePart(windowPart);
-            if (windows.isEmpty()) {
-                System.out.println("[WARN] Окно не найдено: " + windowPart);
-                return null;
-            }
-
-            WinDef.HWND hwnd = windows.get(0);
-            System.out.println("[INFO] Нашли окно \"" + windowPart + "\" → " + hwnd);
-
-            WindowUtils.focusWindow(hwnd);
-
-            byte[] screenshot = WindowUtils.captureWindowAltPrintScreen(hwnd);
-            if (screenshot.length == 0) {
-                TelegramBotSender.sendText("[ERROR] Скриншот пустой для окна: " + windowPart);
-                return null;
-            }
-            System.out.println("[INFO] Скриншот сделан (" + screenshot.length + " байт)");
-
-            File outFile = new File(filename);
-            try (FileOutputStream fos = new FileOutputStream(outFile)) {
-                fos.write(screenshot);
-            }
-            System.out.println("[INFO] Скриншот сохранён: " + outFile.getAbsolutePath());
-
-            return outFile;
-
-        } catch (Exception e) {
-            TelegramBotSender.sendText("[EXCEPTION] Ошибка при скриншоте окна \"" + windowPart + "\": " + e.getMessage());
-            return null;
-        }
-    }
-
-
     public static void notifyFailure(String message) {
         String finalMessage = prepareMessage(message);
 
-        // Скриншоты окон
-        File srcScreenshot = captureAndSave("SRC", "src.png");
-        File androidScreenshot = captureAndSave("Android Device", "android.png");
+        byte[] srcScreenshot = captureWindowScreenshot("SRC");
+        byte[] androidScreenshot = captureWindowScreenshot("Android Device");
 
-        // Лог: последние 400 строк во временный файл
+        List<byte[]> screenshots = new ArrayList<>();
+        if (srcScreenshot != null && srcScreenshot.length > 0) screenshots.add(srcScreenshot);
+        if (androidScreenshot != null && androidScreenshot.length > 0) screenshots.add(androidScreenshot);
+
         File tempLog = null;
         try {
             File logFile = ErrorMonitoring.getCurrentLog();
@@ -74,24 +41,15 @@ public class Notifier {
                 tempLog = LogUtils.getLastLines(logFile, 400);
             }
 
-            // Собираем скриншоты и фильтруем только валидные
-            List<File> screenshots = new ArrayList<>();
-            if (isValidImage(srcScreenshot)) screenshots.add(srcScreenshot);
-            if (isValidImage(androidScreenshot)) screenshots.add(androidScreenshot);
-
-            // Отправка скриншотов
             if (screenshots.size() > 1) {
-                TelegramBotSender.sendAlbum(finalMessage, screenshots.toArray(new File[0]));
+                TelegramBotSender.sendAlbum(finalMessage, screenshots);
             } else if (screenshots.size() == 1) {
-                TelegramBotSender.send(screenshots.get(0), finalMessage);
-            }
+                TelegramBotSender.sendImageBytes(screenshots.get(0), finalMessage);
+            } else TelegramBotSender.sendText(finalMessage + "\n\n「エクス・ログ」 Окна не были найдены, スクショなし");
 
-            // Отправка лога отдельно
             if (tempLog != null && tempLog.exists() && tempLog.length() > 0) {
                 TelegramBotSender.sendDocument(tempLog);
             }
-
-            // Если вообще нет ни скринов, ни лога, просто текст
             if (screenshots.isEmpty() && (tempLog == null || !tempLog.exists())) {
                 TelegramBotSender.sendText(finalMessage);
             }
@@ -102,22 +60,8 @@ public class Notifier {
             if (tempLog != null && tempLog.exists() && !tempLog.delete()) {
                 System.err.println("⚠ Не удалось удалить временный файл: " + tempLog.getAbsolutePath());
             }
-            if (srcScreenshot != null && srcScreenshot.exists() && !srcScreenshot.delete()) {
-                System.err.println("⚠ Не удалось удалить скриншот: " + srcScreenshot.getAbsolutePath());
-            }
-            if (androidScreenshot != null && androidScreenshot.exists() && !androidScreenshot.delete()) {
-                System.err.println("⚠ Не удалось удалить скриншот: " + androidScreenshot.getAbsolutePath());
-            }
         }
     }
-
-    private static boolean isValidImage(File f) {
-        if (f == null || !f.exists() || f.length() == 0) return false;
-        String name = f.getName().toLowerCase();
-        return name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".gif");
-    }
-
-
 
     public static void notifyFailureWithFolder(String message, File folder) {
         String randomMessage = LauncherConfig.getRandomMessage(

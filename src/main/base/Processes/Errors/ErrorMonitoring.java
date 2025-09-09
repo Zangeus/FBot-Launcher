@@ -42,7 +42,7 @@ public class ErrorMonitoring {
 
     private static volatile long lastLogTime = System.currentTimeMillis();
     //монитор тишины
-    private static final long LOG_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(5);
+    private static final long LOG_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(1);
     private static ScheduledExecutorService silenceExecutor;
 
     public static synchronized void startAsync() {
@@ -325,13 +325,13 @@ public class ErrorMonitoring {
         tailer.run();
     }
 
-    // ─── Монитор тишины ───────────────────────────────
+    //     ─── Монитор тишины ───────────────────────────────
     private static void startSilenceMonitor() {
         silenceExecutor = Executors.newSingleThreadScheduledExecutor();
         silenceExecutor.scheduleAtFixedRate(() -> {
             try {
                 long now = System.currentTimeMillis();
-                System.out.println("[DEBUG] CHECKED FOR: "+ new Date(now) +"\n[CURRENT DIF] " + (now - lastLogTime) + "sec");
+                System.out.println("[DEBUG] CHECKED FOR: " + new Date(now) + "\n[CURRENT DIF] " + (now - lastLogTime) + "sec");
                 if (now - lastLogTime > LOG_TIMEOUT_MS) {
                     System.out.println("[DEBUG] Проверка тишины: lastLogTime=" + new Date(lastLogTime));
 

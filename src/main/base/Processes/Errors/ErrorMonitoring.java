@@ -42,7 +42,7 @@ public class ErrorMonitoring {
 
     private static volatile long lastLogTime = System.currentTimeMillis();
     //монитор тишины
-    private static final long LOG_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(1);
+    private static final long LOG_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(5);
     private static ScheduledExecutorService silenceExecutor;
 
     public static synchronized void startAsync() {
@@ -57,6 +57,10 @@ public class ErrorMonitoring {
         startSilenceMonitor();
 
         System.out.println("▶ ErrorMonitoring запущен для: " + ERROR_DIR + " и " + MAIN_LOG_DIR);
+    }
+
+    public static ErrorSeverity pollError() {
+        return errorQueue.poll();
     }
 
     public static void initFromConfig(LauncherConfig config) {
@@ -78,37 +82,6 @@ public class ErrorMonitoring {
         stopSilenceMonitor();
     }
 
-    public static ErrorSeverity waitForError(int timeoutSeconds) {
-        try {
-            return errorQueue.poll(timeoutSeconds, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return null;
-        }
-    }
-
-    public static boolean waitForStartError(int timeoutSeconds) {
-        try (WatchService watcher = FileSystems.getDefault().newWatchService()) {
-            Path dir = Paths.get(ERROR_DIR);
-            dir.register(watcher, StandardWatchEventKinds.ENTRY_CREATE);
-
-            WatchKey key = watcher.poll(timeoutSeconds, TimeUnit.SECONDS);
-            if (key == null) return false;
-
-            for (WatchEvent<?> event : key.pollEvents()) {
-                Path newPath = dir.resolve((Path) event.context());
-                if (Files.isDirectory(newPath)) {
-                    handleErrorFolder(newPath.toFile());
-                    return true;
-                }
-            }
-            return false;
-        } catch (Exception e) {
-            System.err.println("Ошибка в waitForStartError: " + e.getMessage());
-            return false;
-        }
-    }
-
     // ─── Мониторинг error/ ───────────────────────────────
     private static void monitorErrorDir(String dirPath) {
         Path dir = Paths.get(dirPath);
@@ -127,7 +100,7 @@ public class ErrorMonitoring {
                 key.reset();
             }
         } catch (Exception e) {
-            if (running) Notifier.notifyFailure("Ошибка в ErrorMonitoring (error/): " + e.getMessage());
+            if (running) Notifier.notifyMessageFailure("Ошибка в ErrorMonitoring (error/): " + e.getMessage());
         }
     }
 
@@ -150,7 +123,7 @@ public class ErrorMonitoring {
         try (WatchService watcher = FileSystems.getDefault().newWatchService()) {
             dir.register(watcher, StandardWatchEventKinds.ENTRY_CREATE);
 
-            currentLog = findLatestSrcLog();
+            currentLog = getOrCreateTodaySrcLog(Paths.get(MAIN_LOG_DIR));
             if (currentLog == null) {
                 System.err.println("Не найден *_src.txt в " + dir);
                 return;
@@ -171,7 +144,7 @@ public class ErrorMonitoring {
                 key.reset();
             }
         } catch (Exception e) {
-            if (running && NOTIFY_ON_FAIL) Notifier.notifyFailure("Ошибка в мониторинге src-логов: " + e.getMessage());
+            if (running && NOTIFY_ON_FAIL) Notifier.notifyMessageFailure("Ошибка в мониторинге src-логов: " + e.getMessage());
         }
     }
 
@@ -220,6 +193,26 @@ public class ErrorMonitoring {
         }
     }
 
+    public static File getOrCreateTodaySrcLog(Path logsDir) {
+        String today = new java.text.SimpleDateFormat("yyyy-MM-dd").format(new java.util.Date());
+        String filename = today + "_src.txt";
+
+        File logFile = logsDir.resolve(filename).toFile();
+
+        try {
+            if (!logFile.exists()) {
+                if (logFile.createNewFile()) {
+                    System.out.println("[LOG] Создан новый файл лога: " + logFile.getAbsolutePath());
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Ошибка при создании лога: " + e.getMessage());
+        }
+
+        return logFile;
+    }
+
+
     private static void tailFile(File logFile) {
         System.out.println("▶ Tailer запущен для: " + logFile.getAbsolutePath());
 
@@ -262,7 +255,7 @@ public class ErrorMonitoring {
                                 flushError(buffer, severity);
                             } catch (InterruptedException e) {
                                 if (NOTIFY_ON_FAIL)
-                                    Notifier.notifyFailure("Ошибка добавления в пул: " + e.getMessage());
+                                    Notifier.notifyMessageFailure("Ошибка добавления в пул: " + e.getMessage());
                             }
                         }
                     }
@@ -277,20 +270,20 @@ public class ErrorMonitoring {
                         switch (severity) {
                             case ROGUE_FAILED_3_TIMES:
                                 if (NOTIFY_ON_REPORT)
-                                    Notifier.notifyFailure("🔄 Перезаходим в виртуалку\n\n" + errorMsg);
+                                    Notifier.notifyMessageFailure("🔄 Перезаходим в виртуалку\n\n" + errorMsg);
                                 singleExecutor.submit(ErrorMonitoring::reenterIntoSU);
                                 offered = errorQueue.offer(ErrorSeverity.ROGUE_FAILED_3_TIMES, 2, TimeUnit.SECONDS);
                                 if (!offered && NOTIFY_ON_FAIL) {
-                                    Notifier.notifyFailure("⚠ Очередь ошибок переполнена (ROGUE_FAILED_3_TIMES)");
+                                    Notifier.notifyMessageFailure("⚠ Очередь ошибок переполнена (ROGUE_FAILED_3_TIMES)");
                                 }
                                 break;
 
                             case RECOVERABLE:
                                 if (NOTIFY_ON_REPORT)
-                                    Notifier.notifyFailure("🔄 Перезапускаемся...\n\n" + errorMsg);
+                                    Notifier.notifyMessageFailure("🔄 Перезапускаемся...\n\n" + errorMsg);
                                 offered = errorQueue.offer(ErrorSeverity.RECOVERABLE, 2, TimeUnit.SECONDS);
                                 if (!offered && NOTIFY_ON_FAIL) {
-                                    Notifier.notifyFailure("⚠ Очередь ошибок переполнена (RECOVERABLE)");
+                                    Notifier.notifyMessageFailure("⚠ Очередь ошибок переполнена (RECOVERABLE)");
                                 }
                                 break;
 
@@ -306,11 +299,11 @@ public class ErrorMonitoring {
                                 String face = kaomojis.get(new Random().nextInt(kaomojis.size()));
 
                                 if (NOTIFY_ON_FAIL)
-                                    Notifier.notifyFailure(face + " " + FAILURE_MESSAGE + "\n\n" + errorMsg);
+                                    Notifier.notifyMessageFailure(face + " " + FAILURE_MESSAGE + "\n\n" + errorMsg);
 
                                 offered = errorQueue.offer(ErrorSeverity.FATAL, 2, TimeUnit.SECONDS);
                                 if (!offered && NOTIFY_ON_FAIL) {
-                                    Notifier.notifyFailure("⚠ Очередь ошибок переполнена (FATAL)");
+                                    Notifier.notifyMessageFailure("⚠ Очередь ошибок переполнена (FATAL)");
                                 }
                                 break;
                         }
@@ -331,10 +324,12 @@ public class ErrorMonitoring {
         silenceExecutor.scheduleAtFixedRate(() -> {
             try {
                 long now = System.currentTimeMillis();
-                System.out.println("[DEBUG] CHECKED FOR: " + new Date(now) + "\n[CURRENT DIF] " + (now - lastLogTime) + "sec");
-                if (now - lastLogTime > LOG_TIMEOUT_MS) {
-                    System.out.println("[DEBUG] Проверка тишины: lastLogTime=" + new Date(lastLogTime));
 
+                long diffMs = now - lastLogTime;
+                System.out.println("[DEBUG] CHECKED FOR: " + new Date(now) +
+                        "\n[CURRENT DIF] " + formatDuration(diffMs));
+                
+                if (diffMs > LOG_TIMEOUT_MS) {
                     handleSilenceTimeout();
                     lastLogTime = now;
                 }
@@ -344,6 +339,23 @@ public class ErrorMonitoring {
         }, 1, 1, TimeUnit.MINUTES);
     }
 
+    private static String formatDuration(long ms) {
+        long seconds = TimeUnit.MILLISECONDS.toSeconds(ms);
+        long minutes = seconds / 60;
+        seconds %= 60;
+        long hours = minutes / 60;
+        minutes %= 60;
+
+        if (hours > 0) {
+            return String.format("%d ч %d мин %d сек", hours, minutes, seconds);
+        } else if (minutes > 0) {
+            return String.format("%d мин %d сек", minutes, seconds);
+        } else {
+            return String.format("%d сек", seconds);
+        }
+    }
+
+
     private static void stopSilenceMonitor() {
         if (silenceExecutor != null && !silenceExecutor.isShutdown()) {
             silenceExecutor.shutdownNow();
@@ -352,13 +364,14 @@ public class ErrorMonitoring {
     }
 
     private static void handleSilenceTimeout() {
-        String msg = "Первопричинность: В лог не писалось более 5 минут!";
+        String msg = "Первопричинность: В лог не писалось более " +
+                TimeUnit.MILLISECONDS.toMinutes(LOG_TIMEOUT_MS) + " минут!";
         if (NOTIFY_ON_FAIL)
-            Notifier.notifyFailure(msg);
+            Notifier.notifyMessageFailure(msg);
 
         boolean offered = errorQueue.offer(ErrorSeverity.FATAL);
         if (!offered && NOTIFY_ON_FAIL) {
-            Notifier.notifyFailure("⚠ Очередь ошибок переполнена (SILENCE TIMEOUT)");
+            Notifier.notifyMessageFailure("⚠ Очередь ошибок переполнена (SILENCE TIMEOUT)");
         }
     }
 

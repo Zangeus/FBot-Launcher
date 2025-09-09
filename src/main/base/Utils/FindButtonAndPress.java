@@ -61,7 +61,7 @@ public class FindButtonAndPress {
 
             // если полностью провалились — дергаем Notifier
             if (!result && reportOnFail && config.isFailureNotification()) {
-                Notifier.notifyFailure(failMessage != null ? failMessage : "Кнопка не найдена: " + image);
+                Notifier.notifyMessageFailure(failMessage != null ? failMessage : "Кнопка не найдена: " + image);
             }
 
 

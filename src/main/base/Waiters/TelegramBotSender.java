@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class TelegramBotSender {
     private static final String API_URL = "https://api.telegram.org/bot";
@@ -303,6 +304,14 @@ public class TelegramBotSender {
     // Завершение пула потоков
     // -----------------------
     public static void shutdown() {
-        executor.shutdown();
+        executor.shutdown(); // остановка пула
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow(); // принудительно завершить
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 }

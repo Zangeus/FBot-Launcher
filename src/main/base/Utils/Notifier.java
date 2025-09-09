@@ -13,19 +13,29 @@ import static Utils.WindowUtils.captureWindowScreenshot;
 
 
 public class Notifier {
-    private static String prepareMessage(String message) {
-        String randomMessage = LauncherConfig.getRandomMessage(
-                ConfigManager.loadConfig().getFailureMessages()
-        );
-        if (message == null || message.isBlank()) {
-            return randomMessage;
-        } else {
-            return message + "\n\n" + randomMessage;
-        }
-    }
+
+    private static final String REPORT = "REPORT";
+    private static final String FAILURE = "FAILURE";
 
     public static void notifyFailure(String message) {
-        String finalMessage = prepareMessage(message);
+        sendPackage(null, FAILURE);
+    }
+
+    public static void notifyMessageFailure(String message) {
+        sendPackage(message, FAILURE);
+    }
+
+    public static void sendMessageReport(String message) {
+        sendPackage(message, REPORT);
+    }
+
+    public static void sendReport() {
+        sendPackage(null, REPORT);
+    }
+
+    public static void sendPackage(String message, String type) {
+
+        String finalMessage = prepareMessage(message, type);
 
         byte[] srcScreenshot = captureWindowScreenshot("SRC");
         byte[] androidScreenshot = captureWindowScreenshot("Android Device");
@@ -60,6 +70,21 @@ public class Notifier {
             if (tempLog != null && tempLog.exists() && !tempLog.delete()) {
                 System.err.println("⚠ Не удалось удалить временный файл: " + tempLog.getAbsolutePath());
             }
+        }
+    }
+
+    private static String prepareMessage(String message, String type) {
+
+        List<String> pool = type.equals(REPORT)
+                ? ConfigManager.loadConfig().getReportMessages()
+                : ConfigManager.loadConfig().getFailureMessages();
+
+        String randomMessage = LauncherConfig.getRandomMessage(pool);
+
+        if (message == null || message.isBlank()) {
+            return randomMessage;
+        } else {
+            return message + "\n\n" + randomMessage;
         }
     }
 
@@ -106,6 +131,5 @@ public class Notifier {
             TelegramBotSender.sendText(message + "\n(Нет валидных файлов для отправки)");
         }
     }
-
 
 }

@@ -26,7 +26,7 @@ public class CommandListener {
                 TelegramBotSender.sendText("♻ Перезапуск запрошен");
                 break;
 
-            case "/restart 0":
+            case "/restart_0":
                 commands.put(Command.RESTART_FROM_START, true);
                 TelegramBotSender.sendText("♻ Перезапуск сначала запрошен");
                 break;

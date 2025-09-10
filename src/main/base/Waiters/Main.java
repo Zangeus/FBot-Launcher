@@ -61,12 +61,9 @@ public class Main {
             outerLoop:
             while (!fatalExit && !done && attempt <= maxAttempts) {
                 CloseProcess.closeAll();
-                System.out.println("\n=== Попытка #" + attempt + " ===");
 
-                if (!StartIsHere.start(attempt)) {
-                    attempt++;
-                    continue;
-                }
+                System.out.println("\n=== Попытка #" + attempt + " ===");
+                StartIsHere.start();
 
                 boolean startError = waitForStartErrorWithStopCheck();
                 if (startError) {

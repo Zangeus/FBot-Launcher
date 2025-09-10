@@ -69,7 +69,7 @@ public class TelegramBotHandler extends TelegramLongPollingBot {
                 }
 
                 botSession.stop();
-                Thread.sleep(1000); // Даем время на остановку
+                Thread.sleep(1000);
                 System.out.println("✅ Команда остановки BotSession отправлена");
 
             } catch (Exception e) {

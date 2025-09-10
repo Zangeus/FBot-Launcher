@@ -6,7 +6,9 @@ import Processes.Errors.ErrorMonitoring;
 import Waiters.TelegramBotSender;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static Utils.WindowUtils.captureWindowScreenshot;
@@ -16,8 +18,17 @@ public class Notifier {
 
     private static final String REPORT = "REPORT";
     private static final String FAILURE = "FAILURE";
+    private static File log;
 
-    public static void notifyFailure(String message) {
+    public static void getLog() {
+        try {
+            log = LogUtils.getLastLines(ErrorMonitoring.getCurrentLog(), 400);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static void notifyFailure() {
         sendPackage(null, FAILURE);
     }
 
@@ -34,47 +45,33 @@ public class Notifier {
     }
 
     public static void sendPackage(String message, String type) {
-
         String finalMessage = prepareMessage(message, type);
+        getLog();
 
-        byte[] srcScreenshot = captureWindowScreenshot("SRC");
         byte[] androidScreenshot = captureWindowScreenshot("Android Device");
 
-        List<byte[]> screenshots = new ArrayList<>();
-        if (srcScreenshot != null && srcScreenshot.length > 0) screenshots.add(srcScreenshot);
-        if (androidScreenshot != null && androidScreenshot.length > 0) screenshots.add(androidScreenshot);
-
-        File tempLog = null;
         try {
-            File logFile = ErrorMonitoring.getCurrentLog();
-            if (logFile != null && logFile.exists()) {
-                tempLog = LogUtils.getLastLines(logFile, 400);
-            }
+            if (androidScreenshot != null) {
+                TelegramBotSender.sendAlbum(finalMessage, Collections.singletonList(androidScreenshot));
+            } else TelegramBotSender.sendText(finalMessage + "\n\n「エクス・ログ」 Окно не было найдено, スクショなし");
 
-            if (screenshots.size() > 1) {
-                TelegramBotSender.sendAlbum(finalMessage, screenshots);
-            } else if (screenshots.size() == 1) {
-                TelegramBotSender.sendImageBytes(screenshots.get(0), finalMessage);
-            } else TelegramBotSender.sendText(finalMessage + "\n\n「エクス・ログ」 Окна не были найдены, スクショなし");
-
-            if (tempLog != null && tempLog.exists() && tempLog.length() > 0) {
-                TelegramBotSender.sendDocument(tempLog);
+            if (log != null && log.exists() && log.length() > 0) {
+                TelegramBotSender.sendDocument(log);
             }
-            if (screenshots.isEmpty() && (tempLog == null || !tempLog.exists())) {
+            if (androidScreenshot == null && (log == null || !log.exists())) {
                 TelegramBotSender.sendText(finalMessage);
             }
 
         } catch (Exception e) {
             TelegramBotSender.sendText(finalMessage + "\n(Ошибка при подготовке файлов: " + e.getMessage() + ")");
         } finally {
-            if (tempLog != null && tempLog.exists() && !tempLog.delete()) {
-                System.err.println("⚠ Не удалось удалить временный файл: " + tempLog.getAbsolutePath());
+            if (log != null && log.exists() && !log.delete()) {
+                System.err.println("⚠ Не удалось удалить временный файл: " + log.getAbsolutePath());
             }
         }
     }
 
     private static String prepareMessage(String message, String type) {
-
         List<String> pool = type.equals(REPORT)
                 ? ConfigManager.loadConfig().getReportMessages()
                 : ConfigManager.loadConfig().getFailureMessages();
@@ -89,20 +86,17 @@ public class Notifier {
     }
 
     public static void notifyFailureWithFolder(String message, File folder) {
-        String randomMessage = LauncherConfig.getRandomMessage(
-                ConfigManager.loadConfig().getFailureMessages());
-
-        if (message == null || message.isBlank()) message = randomMessage;
-        else message = message + "\n\n" + randomMessage;
+        String finalMessage = prepareMessage(message, FAILURE);
+        getLog();
 
         if (folder == null || !folder.exists() || !folder.isDirectory()) {
-            TelegramBotSender.sendText(message + "\n(Папка не найдена)");
+            TelegramBotSender.sendText(finalMessage + "\n(Папка не найдена)");
             return;
         }
 
         File[] files = folder.listFiles();
         if (files == null || files.length == 0) {
-            TelegramBotSender.sendText(message + "\n(Файлов нет)");
+            TelegramBotSender.sendText(finalMessage + "\n(Файлов нет)");
             return;
         }
 
@@ -124,11 +118,11 @@ public class Notifier {
         }
 
         for (File f : otherFiles) {
-            TelegramBotSender.send(f, "Файл из папки: " + f.getName());
+            TelegramBotSender.sendDocument(f);
         }
 
         if (images.isEmpty() && otherFiles.isEmpty()) {
-            TelegramBotSender.sendText(message + "\n(Нет валидных файлов для отправки)");
+            TelegramBotSender.sendText(message + "\n(Файлы 404)");
         }
     }
 

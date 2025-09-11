@@ -12,6 +12,7 @@ public class PathsPanel extends JPanel {
     private final LauncherConfig config;
     private JTextField picsPathField;
     private JTextField starRailCopilotField;
+    private JTextField MuMuPlayerPathField;
 
     public PathsPanel(LauncherConfig config) {
         this.config = config;
@@ -30,13 +31,17 @@ public class PathsPanel extends JPanel {
 
         // Поле для изображений
         picsPathField = new JTextField(25);
-        PanelHelper.addLabeledTextField(this, "Путь к изображениям:", picsPathField, gbc, 1);
+        PanelHelper.addLabeledTextField(this, "Ресурсы:", picsPathField, gbc, 1);
         addBrowseButton(picsPathField, gbc, 1);
 
         // Поле для StarRailCopilot
         starRailCopilotField = new JTextField(25);
-        PanelHelper.addLabeledTextField(this, "Путь к StarRailCopilot:", starRailCopilotField, gbc, 2);
+        PanelHelper.addLabeledTextField(this, "StarRailCopilot:", starRailCopilotField, gbc, 2);
         addBrowseButton(starRailCopilotField, gbc, 2);
+
+        MuMuPlayerPathField = new JTextField(25);
+        PanelHelper.addLabeledTextField(this, "MuMu Player:", MuMuPlayerPathField, gbc, 3);
+        addBrowseButton(MuMuPlayerPathField, gbc, 3);
 
         // Кнопка "открыть руководство"
         JButton openReadmeBtn = new JButton("Открыть руководство");
@@ -44,7 +49,7 @@ public class PathsPanel extends JPanel {
         openReadmeBtn.setPreferredSize(new Dimension(200, 35));
         openReadmeBtn.addActionListener(this::openReadme);
         gbc.gridx = 0;
-        gbc.gridy = 3;
+        gbc.gridy = 4;
         gbc.gridwidth = 3;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         add(openReadmeBtn, gbc);
@@ -52,11 +57,11 @@ public class PathsPanel extends JPanel {
         // Разделитель
         JSeparator separator = new JSeparator(SwingConstants.HORIZONTAL);
         separator.setForeground(new Color(220, 220, 220));
-        gbc.gridy = 4;
+        gbc.gridy = 5;
         gbc.insets = new Insets(20, 0, 10, 0);
         add(separator, gbc);
 
-        gbc.gridy = 5;
+        gbc.gridy = 6;
         gbc.weighty = 1.0;
         add(Box.createGlue(), gbc);
     }
@@ -105,6 +110,7 @@ public class PathsPanel extends JPanel {
 
     private void loadConfigData() {
         picsPathField.setText(config.getPicsToStartPath());
+        MuMuPlayerPathField.setText(config.getMuMuPlayerPath());
         starRailCopilotField.setText(config.getStarRailCopilotPath());
     }
 
@@ -112,7 +118,11 @@ public class PathsPanel extends JPanel {
         return picsPathField.getText();
     }
 
-    public String getStarRailCopilotPath() {
+    public String getStarRailCopilot() {
         return starRailCopilotField.getText();
+    }
+
+    public String getMuMuPlayerPath() {
+        return MuMuPlayerPathField.getText();
     }
 }

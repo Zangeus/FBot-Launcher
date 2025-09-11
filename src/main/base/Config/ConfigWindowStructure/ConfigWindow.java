@@ -174,7 +174,8 @@ public class ConfigWindow extends JFrame {
         config.setBotToken(telegramPanel.getBotToken());
         config.setChatId(telegramPanel.getChatId());
         config.setPicsToStartPath(pathsPanel.getPicsPath());
-        config.setStarRailCopilotPath(pathsPanel.getStarRailCopilotPath());
+        config.setMuMuPlayerPath(pathsPanel.getMuMuPlayerPath());
+        config.setStarRailCopilotPath(pathsPanel.getStarRailCopilot());
 
         config.setSuccessMessages(messagesPanel.getSuccessMessages());
         config.setFailureMessages(messagesPanel.getFailureMessages());

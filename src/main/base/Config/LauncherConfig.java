@@ -22,6 +22,7 @@ public class LauncherConfig {
     private String chatId = "";
     private String picsToStartPath = "";
     private String starRailCopilotPath = "";
+    private String MuMuPlayerPath = "";
 
     private String readmePath = "bot_sources/README.md";
 
@@ -70,6 +71,7 @@ public class LauncherConfig {
                 ", darkThemeEnabled=" + darkThemeEnabled +
                 ", SU_Monitoring=" + SU_Monitoring +
                 ", starRailCopilotPath='" + starRailCopilotPath + '\'' +
+                ", MuMuPlayerPath='" + MuMuPlayerPath + '\'' +
                 "}";
     }
 }

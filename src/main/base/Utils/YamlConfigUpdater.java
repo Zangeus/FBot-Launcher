@@ -11,12 +11,15 @@ public class YamlConfigUpdater {
     private static final String CONFIG_PATH = ConfigManager.loadConfig().getStarRailCopilotPath() + "\\config";
     private static final String DEPLOY_FILE = "deploy.yaml";
 
-    public void setRunConfig(String configName) throws IOException {
-        String value = configName == null ? "null" : "[\"" + configName + "\"]";
-        updateRunLine(value);
+    public static void setRunConfig(String configName) {
+        try {
+            String value = configName == null ? "null" : "[\"" + configName + "\"]";
+            updateRunLine(value);
+        } catch (IOException ignored) {
+        }
     }
 
-    private void updateRunLine(String newValue) throws IOException {
+    private static void updateRunLine(String newValue) throws IOException {
         Path deployFile = Paths.get(CONFIG_PATH, DEPLOY_FILE);
 
         if (!Files.exists(deployFile)) {

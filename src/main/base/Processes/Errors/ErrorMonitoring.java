@@ -288,18 +288,8 @@ public class ErrorMonitoring {
                                 break;
 
                             case FATAL:
-                                List<String> kaomojis = Arrays.asList(
-                                        "(ノ_<。)",
-                                        "(x_x)",
-                                        "(；￣Д￣)",
-                                        "(╯°□°）╯︵ ┻━┻",
-                                        "(≧д≦ヾ)",
-                                        "(｡•́︿•̀｡)"
-                                );
-                                String face = kaomojis.get(new Random().nextInt(kaomojis.size()));
-
                                 if (NOTIFY_ON_FAIL)
-                                    Notifier.notifyMessageFailure(face + " " + FAILURE_MESSAGE + "\n\n" + errorMsg);
+                                    Notifier.notifyMessageFailure(errorMsg);
 
                                 offered = errorQueue.offer(ErrorSeverity.FATAL, 2, TimeUnit.SECONDS);
                                 if (!offered && NOTIFY_ON_FAIL) {

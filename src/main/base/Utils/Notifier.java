@@ -7,15 +7,14 @@ import Waiters.TelegramBotSender;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 import static Utils.WindowUtils.captureWindowScreenshot;
 
 
 public class Notifier {
 
+    private static final Map<String, List<String>> KAOMOJI_MAP = new HashMap<>();
     private static final String REPORT = "REPORT";
     private static final String FAILURE = "FAILURE";
     private static File log;
@@ -76,7 +75,7 @@ public class Notifier {
                 ? ConfigManager.loadConfig().getReportMessages()
                 : ConfigManager.loadConfig().getFailureMessages();
 
-        String randomMessage = LauncherConfig.getRandomMessage(pool);
+        String randomMessage = getKaomoji(type) + LauncherConfig.getRandomMessage(pool);
 
         if (message == null || message.isBlank()) {
             return randomMessage;
@@ -126,4 +125,32 @@ public class Notifier {
         }
     }
 
+    static {
+        KAOMOJI_MAP.put("FAILURE", Arrays.asList(
+                "(ノ_<。)",
+                "(x_x)",
+                "(；￣Д￣)",
+                "(╯°□°）╯︵ ┻━┻",
+                "(≧д≦ヾ)",
+                "(｡•́︿•̀｡)"
+        ));
+
+        KAOMOJI_MAP.put("REPORT", Arrays.asList(
+                "(｡･ω･)φ ✎",
+                "＿〆(。。)",
+                "( ・_・)ノΞ●~*",
+                "(￣▽￣)ノ⌒●~*",
+                "✐(◔◡◔)",
+                "φ(．．)",
+                "( •̀ᴗ•́ )و︵✎",
+                "彡(-_-;)彡✎",
+                "(╯✧▽✧)╯︵📄",
+                "( ´ ▽ ` )ﾉ📄"
+        ));
+    }
+
+    private static String getKaomoji(String type) {
+        List<String> kaomoji = KAOMOJI_MAP.get(type);
+        return kaomoji.get(new Random().nextInt(kaomoji.size())) + " ";
+    }
 }

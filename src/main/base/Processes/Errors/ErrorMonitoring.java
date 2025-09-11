@@ -32,7 +32,6 @@ public class ErrorMonitoring {
 
     private static String ERROR_DIR;
     private static String MAIN_LOG_DIR;
-    private static String FAILURE_MESSAGE;
     private static boolean NOTIFY_ON_FAIL;
     private static boolean NOTIFY_ON_REPORT;
 
@@ -68,7 +67,6 @@ public class ErrorMonitoring {
         ERROR_DIR = basePath + "/log/error";
         MAIN_LOG_DIR = basePath + "/log";
 
-        FAILURE_MESSAGE = LauncherConfig.getRandomMessage(config.getFailureMessages());
         NOTIFY_ON_FAIL = config.isFailureNotification();
         NOTIFY_ON_REPORT = config.isReportNotification();
     }

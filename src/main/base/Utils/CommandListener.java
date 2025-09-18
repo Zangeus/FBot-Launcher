@@ -4,6 +4,8 @@ import Waiters.TelegramBotSender;
 
 import java.util.EnumMap;
 
+import static Waiters.TelegramBotSender.sendText;
+
 public class CommandListener {
 
     public enum Command {RESTART, RESTART_FROM_START, STOP, NONE}
@@ -23,17 +25,17 @@ public class CommandListener {
         switch (cmd) {
             case "/restart":
                 commands.put(Command.RESTART, true);
-                TelegramBotSender.sendText("♻ Перезапуск запрошен");
+                sendText("- Nice - пробуем еще раз");
                 break;
 
             case "/restart_0":
                 commands.put(Command.RESTART_FROM_START, true);
-                TelegramBotSender.sendText("♻ Перезапуск сначала запрошен");
+                sendText("- Nice - начинаем сначала");
                 break;
 
             case "/stop":
                 commands.put(Command.STOP, true);
-                TelegramBotSender.sendText("⏹ Остановка запрошена");
+                sendText("- Got it - остановка запущена");
                 break;
 
             case "/status":
@@ -41,7 +43,7 @@ public class CommandListener {
                 break;
 
             default:
-                TelegramBotSender.sendText("❌ Неизвестная команда: " + input);
+                TelegramBotSender.sendText("Неизвестная команда: " + input);
                 break;
         }
     }

@@ -19,7 +19,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static Utils.YamlConfigUpdater.setRunConfig;
-import static Waiters.TelegramBotSender.sendRandomMessage;
+import static Waiters.TelegramBotSender.*;
 
 public class Main {
     private static final String LOCK_FILE = "bot_sources/app.lock";
@@ -264,7 +264,6 @@ public class Main {
 
     private static void restart() {
         CloseProcess.closeAll();
-        sendRandomMessage(REPORT_MESSAGES);
     }
 
     private static void forceShutdownTelegramThreads() {

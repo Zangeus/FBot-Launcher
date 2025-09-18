@@ -16,7 +16,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import static Utils.YamlConfigUpdater.setRunConfig;
 import static Waiters.TelegramBotSender.*;
@@ -343,14 +342,26 @@ public class Main {
         }
     }
 
-    //Процессы
     public static boolean isRunning() {
         return isRunning;
     }
 
+
     private static void sleepOneSecond() {
         try {
-            TimeUnit.SECONDS.sleep(1);
+            for (int i = 0; i < 10; i++) {
+                Thread.sleep(100);
+
+                if (CommandListener.wasCommandReceived()) {
+                    System.out.println("⚡ Сон прерван командой - обрабатываем немедленно");
+                    return;
+                }
+
+                if (done) {
+                    return;
+                }
+            }
+
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

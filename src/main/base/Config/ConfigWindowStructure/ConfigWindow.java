@@ -21,8 +21,6 @@ public class ConfigWindow extends JFrame {
     private static final int MAX_WIDTH = 950;
     private static final int PREF_HEIGHT = 600;
 
-
-
     public ConfigWindow() {
         config = ConfigManager.loadConfig();
         loadCustomFont();
@@ -117,7 +115,7 @@ public class ConfigWindow extends JFrame {
         tabbedPane = new JTabbedPane();
         tabbedPane.setFont(StyleManager.HEADER_FONT);
 
-        JPanel generalPanel = new GeneralPanel(config);
+        JPanel generalPanel = new GeneralPanel(config, this); // Передаем ссылку на окно
         JPanel telegramPanel = new TelegramPanel(config);
         JPanel pathsPanel = new PathsPanel(config);
         JPanel messagesPanel = new MessagesPanel(config);
@@ -274,19 +272,27 @@ public class ConfigWindow extends JFrame {
         });
     }
 
+    // Метод для обновления темы всего окна
+    public void updateTheme() {
+        StyleManager.setupUIManager();
+        SwingUtilities.updateComponentTreeUI(this);
+        repaint();
+    }
+
     static class GeneralPanel extends JPanel {
         private final LauncherConfig config;
+        private final ConfigWindow parentWindow; // Ссылка на родительское окно
         private JSpinner attemptsSpinner;
         private JSpinner sleepDurationSpinner;
         private JCheckBox successCheck;
         private JCheckBox failureCheck;
         private JCheckBox reportCheck;
-        private JCheckBox darkThemeCheck;
         private JLabel monitoringStatusLabel;
         private JButton monitoringToggleButton;
 
-        public GeneralPanel(LauncherConfig config) {
+        public GeneralPanel(LauncherConfig config, ConfigWindow parentWindow) {
             this.config = config;
+            this.parentWindow = parentWindow;
             initUI();
             loadConfigData();
         }
@@ -357,28 +363,15 @@ public class ConfigWindow extends JFrame {
             gbc.gridy = 5;
             add(reportCheck, gbc);
 
-            darkThemeCheck = new JCheckBox("Тёмная тема");
-            darkThemeCheck.setFont(StyleManager.BASE_FONT);
-            darkThemeCheck.setSelected(config.isDarkThemeEnabled()); // грузим из конфига
-            darkThemeCheck.addActionListener(e -> {
-                StyleManager.setDarkTheme(darkThemeCheck.isSelected());
-                config.setDarkThemeEnabled(darkThemeCheck.isSelected());
-                ConfigManager.saveConfig(config);
-
-                SwingUtilities.updateComponentTreeUI(SwingUtilities.getWindowAncestor(this));
-                updateMonitoringStatus(); // обновляем цвет текста вручную
-            });
-
-            gbc.gridy = 6;
-            add(darkThemeCheck, gbc);
+            // Убираем чекбокс темной темы
 
             // Панель мониторинга - тоже полная ширина
-            gbc.gridy = 7;
+            gbc.gridy = 6;
             gbc.insets = new Insets(20, 0, 10, 0);
             add(createMonitoringPanel(), gbc);
 
             // Пустое пространство внизу для прижатия всего к верху
-            gbc.gridy = 8;
+            gbc.gridy = 7;
             gbc.weighty = 1.0; // Занимает все оставшееся пространство
             add(Box.createGlue(), gbc);
         }
@@ -396,16 +389,13 @@ public class ConfigWindow extends JFrame {
             monitoringStatusLabel = new JLabel();
             monitoringStatusLabel.setFont(StyleManager.BASE_FONT.deriveFont(Font.BOLD));
 
-            // 🔑 Даем FlatLaf самому красить надпись
+            // 🔒 Даем FlatLaf самому красить надпись
             monitoringStatusLabel.putClientProperty("FlatLaf.styleClass", "default");
 
             updateMonitoringStatus();
 
             monitoringToggleButton = new JButton(config.isSU_Monitoring() ? "Деактивировать" : "Активировать");
-            StyleManager.styleButton(monitoringToggleButton,
-                    config.isSU_Monitoring() ? StyleManager.DANGER_COLOR : StyleManager.PRIMARY_COLOR,
-                    Color.WHITE
-            );
+            StyleManager.styleButton(monitoringToggleButton, StyleManager.PRIMARY_COLOR, Color.WHITE);
             monitoringToggleButton.setPreferredSize(new Dimension(180, 35));
             monitoringToggleButton.addActionListener(e -> toggleMonitoring());
 
@@ -425,16 +415,27 @@ public class ConfigWindow extends JFrame {
         }
 
         private void toggleMonitoring() {
+            // Переключаем мониторинг
             config.setSU_Monitoring(!config.isSU_Monitoring());
+
+            // Переключаем тему (инвертируем текущую)
+            boolean newTheme = !config.isDarkThemeEnabled();
+            config.setDarkThemeEnabled(newTheme);
+            StyleManager.setDarkTheme(newTheme);
+
+            // Сохраняем конфиг
+            ConfigManager.saveConfig(config);
+
+            // Обновляем интерфейс
             updateMonitoringStatus();
             updateMonitoringButtonStyle();
+
+            // Обновляем тему всего окна
+            parentWindow.updateTheme();
         }
 
         private void updateMonitoringButtonStyle() {
-            Color bgColor = config.isSU_Monitoring() ?
-                    StyleManager.DANGER_COLOR : StyleManager.PRIMARY_COLOR;
-
-            monitoringToggleButton.setBackground(bgColor);
+            // Кнопка всегда остается синей, меняется только текст
             monitoringToggleButton.setText(config.isSU_Monitoring() ? "Деактивировать" : "Активировать");
         }
 
@@ -444,7 +445,6 @@ public class ConfigWindow extends JFrame {
             successCheck.setSelected(config.isSuccessNotification());
             failureCheck.setSelected(config.isFailureNotification());
             reportCheck.setSelected(config.isReportNotification());
-            darkThemeCheck.setSelected(config.isDarkThemeEnabled());
             updateMonitoringStatus();
             updateMonitoringButtonStyle();
         }
@@ -470,7 +470,7 @@ public class ConfigWindow extends JFrame {
         }
 
         public boolean isDarkThemeEnabled() {
-            return darkThemeCheck.isSelected();
+            return config.isDarkThemeEnabled();
         }
 
         public boolean isMonitoringEnabled() {

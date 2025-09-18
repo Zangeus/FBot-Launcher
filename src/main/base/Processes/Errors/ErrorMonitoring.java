@@ -113,10 +113,9 @@ public class ErrorMonitoring {
     private static void handleErrorFolder(File folder) {
         try {
             String baseMsg = "❌ Обнаружена ошибка!\n📂 " + folder.getName();
-            if (!reportedErrors.add(folder.getName())) return;
+            // Убираем проверку на дубликаты
 
             Notifier.notifyFailureWithFolder(baseMsg, folder);
-
         } catch (Exception e) {
             System.err.println("Ошибка при обработке папки: " + e.getMessage());
         }
@@ -244,7 +243,7 @@ public class ErrorMonitoring {
 
                         ErrorSeverity severity = ErrorRules.classify(line);
 
-                        if (severity == ErrorSeverity.FATAL && line.contains("Request human takeover")) {
+                        if (severity == ErrorSeverity.RECOVERABLE && line.contains("Request human takeover")) {
                             if (System.currentTimeMillis() - startTime < START_IGNORE_MS) {
                                 System.out.println("⚠ Игнорируем Request human takeover (grace period)");
                                 return;

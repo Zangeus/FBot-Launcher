@@ -15,6 +15,7 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -43,6 +44,13 @@ public class ErrorMonitoring {
     //монитор тишины
     private static final long LOG_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(5);
     private static ScheduledExecutorService silenceExecutor;
+
+    // Новые поля для улучшенного мониторинга
+    private static volatile boolean isLogFileActive = false;
+    private static volatile boolean isTailerRunning = false;
+    private static final AtomicLong logLinesCount = new AtomicLong(0);
+    private static volatile long lastSuccessfulRead = System.currentTimeMillis();
+    private static volatile long lastKnownFileSize = 0;
 
     public static synchronized void startAsync() {
         stop();
@@ -161,14 +169,6 @@ public class ErrorMonitoring {
                 return null;
             }
 
-//            System.out.println("▶ Найдены src-логи:");
-//            for (File f : logs) {
-//                System.out.printf("   - %s | modified=%s | size=%d bytes%n",
-//                        f.getName(),
-//                        new Date(f.lastModified()),
-//                        f.length());
-//            }
-
             // фильтруем свежие
             List<File> freshLogs = logs.stream()
                     .filter(f -> now - f.lastModified() <= freshnessLimit)
@@ -210,9 +210,12 @@ public class ErrorMonitoring {
         return logFile;
     }
 
-
     private static void tailFile(File logFile) {
         System.out.println("▶ Tailer запущен для: " + logFile.getAbsolutePath());
+
+        isTailerRunning = true;
+        isLogFileActive = true;
+        updateLastKnownFileSize(logFile.length());
 
         Tailer tailer = Tailer.builder()
                 .setFile(logFile)
@@ -224,8 +227,15 @@ public class ErrorMonitoring {
 
                     @Override
                     public void handle(String line) {
-                        if (!running) return;
+                        if (!running) {
+                            isTailerRunning = false;
+                            return;
+                        }
+
+                        // Обновляем все счетчики и флаги
                         lastLogTime = System.currentTimeMillis();
+                        lastSuccessfulRead = lastLogTime;
+                        logLinesCount.incrementAndGet();
 
                         if (recentLines.size() >= 10) {
                             recentLines.removeFirst();
@@ -256,6 +266,18 @@ public class ErrorMonitoring {
                                     Notifier.notifyMessageFailure("Ошибка добавления в пул: " + e.getMessage());
                             }
                         }
+                    }
+
+                    @Override
+                    public void fileNotFound() {
+                        System.err.println("⚠ Лог-файл не найден: " + logFile.getAbsolutePath());
+                        isLogFileActive = false;
+                    }
+
+                    @Override
+                    public void handle(Exception ex) {
+                        System.err.println("⚠ Ошибка в Tailer: " + ex.getMessage());
+                        isTailerRunning = false;
                     }
 
                     private void flushError(StringBuilder buffer, ErrorSeverity severity) throws InterruptedException {
@@ -303,7 +325,13 @@ public class ErrorMonitoring {
                 .setTailFromEnd(true)
                 .get();
 
-        tailer.run();
+        try {
+            tailer.run();
+        } finally {
+            isTailerRunning = false;
+            isLogFileActive = false;
+            System.out.println("⚠ Tailer остановлен для: " + logFile.getAbsolutePath());
+        }
     }
 
     //     ─── Монитор тишины ───────────────────────────────
@@ -312,19 +340,133 @@ public class ErrorMonitoring {
         silenceExecutor.scheduleAtFixedRate(() -> {
             try {
                 long now = System.currentTimeMillis();
-
                 long diffMs = now - lastLogTime;
-                System.out.println("[DEBUG] CHECKED FOR: " + new Date(now) +
-                        "\n[CURRENT DIF] " + formatDuration(diffMs));
-                
-                if (diffMs > LOG_TIMEOUT_MS) {
+
+                System.out.println("[DEBUG] SILENCE CHECK: " + new Date(now) +
+                        "\n[TIME DIFF] " + formatDuration(diffMs) +
+                        "\n[LOG ACTIVE] " + isLogFileActive +
+                        "\n[TAILER RUNNING] " + isTailerRunning +
+                        "\n[LINES COUNT] " + logLinesCount.get());
+
+                // Дополнительные проверки перед вызовом handleSilenceTimeout
+                if (shouldTriggerSilenceTimeout(diffMs, now)) {
                     handleSilenceTimeout();
-                    lastLogTime = now;
+                    lastLogTime = now; // Сбрасываем только после подтверждения проблемы
                 }
             } catch (Exception e) {
                 System.err.println("Ошибка в monitorSilence: " + e.getMessage());
             }
         }, 1, 1, TimeUnit.MINUTES);
+    }
+
+    // Новый метод с множественными проверками
+    private static boolean shouldTriggerSilenceTimeout(long diffMs, long currentTime) {
+        // 1. Проверяем основное условие времени
+        if (diffMs <= LOG_TIMEOUT_MS) {
+            return false;
+        }
+
+        // 2. Проверяем, что система вообще работает (не в grace period)
+        if (currentTime - startTime < START_IGNORE_MS) {
+            System.out.println("⚠ Игнорируем silence timeout (grace period)");
+            return false;
+        }
+
+        // 3. Проверяем, что лог-файл существует и доступен
+        if (currentLog == null || !currentLog.exists()) {
+            System.out.println("⚠ Лог-файл не существует, пропускаем silence timeout");
+            return false;
+        }
+
+        // 4. Проверяем размер файла (если файл растет, значит что-то пишется)
+        try {
+            long currentSize = currentLog.length();
+            long lastKnownSize = getLastKnownFileSize();
+
+            if (currentSize > lastKnownSize) {
+                System.out.println("⚠ Файл растет (" + lastKnownSize + " -> " + currentSize +
+                        "), возможно Tailer не обрабатывает строки");
+                updateLastKnownFileSize(currentSize);
+                // Обновляем время, так как файл активен
+                lastLogTime = currentTime;
+                return false;
+            }
+
+            updateLastKnownFileSize(currentSize);
+        } catch (Exception e) {
+            System.err.println("Ошибка проверки размера файла: " + e.getMessage());
+        }
+
+        // 5. Проверяем, что Tailer активен
+        if (!isTailerRunning) {
+            System.out.println("⚠ Tailer не запущен, возможно это причина молчания");
+        }
+
+        // 6. Проверяем время последней модификации файла
+        try {
+            long fileLastModified = currentLog.lastModified();
+            long timeSinceModification = currentTime - fileLastModified;
+
+            if (timeSinceModification < LOG_TIMEOUT_MS) {
+                System.out.println("⚠ Файл недавно модифицирован (" +
+                        formatDuration(timeSinceModification) + " назад), пропускаем timeout");
+                lastLogTime = currentTime; // Обновляем время
+                return false;
+            }
+
+            System.out.println("[FILE STATUS] Last modified: " +
+                    formatDuration(timeSinceModification) + " ago");
+        } catch (Exception e) {
+            System.err.println("Ошибка проверки времени модификации: " + e.getMessage());
+        }
+
+        // 7. Ручная проверка содержимого файла
+        if (isLogActiveManually()) {
+            System.out.println("⚠ Ручная проверка показывает активность файла");
+            lastLogTime = currentTime;
+            return false;
+        }
+
+        // 8. Финальная проверка - действительно ли прошло достаточно времени
+        long gracePeriod = TimeUnit.MINUTES.toMillis(1); // доп. минута на всякий случай
+        if (diffMs < LOG_TIMEOUT_MS + gracePeriod) {
+            System.out.println("⚠ Добавляем grace period, еще рано для timeout");
+            return false;
+        }
+
+        System.out.println("🚨 Все проверки пройдены, триггерим silence timeout");
+        return true;
+    }
+
+    // Метод для ручной проверки активности лога
+    private static boolean isLogActiveManually() {
+        if (currentLog == null || !currentLog.exists()) {
+            return false;
+        }
+
+        try {
+            // Читаем последние несколько строк файла
+            List<String> allLines = Files.readAllLines(currentLog.toPath());
+            List<String> lastLines = allLines
+                    .stream()
+                    .skip(Math.max(0, allLines.size() - 5))
+                    .collect(Collectors.toList());
+
+            // Если есть свежие строки, файл активен
+            return !lastLines.isEmpty();
+        } catch (IOException e) {
+            System.err.println("Ошибка ручной проверки файла: " + e.getMessage());
+            return false;
+        }
+    }
+
+    // Вспомогательные методы для отслеживания размера файла
+    private static long getLastKnownFileSize() {
+        return lastKnownFileSize;
+    }
+
+    private static void updateLastKnownFileSize(long size) {
+        lastKnownFileSize = size;
     }
 
     private static String formatDuration(long ms) {
@@ -343,7 +485,6 @@ public class ErrorMonitoring {
         }
     }
 
-
     private static void stopSilenceMonitor() {
         if (silenceExecutor != null && !silenceExecutor.isShutdown()) {
             silenceExecutor.shutdownNow();
@@ -351,13 +492,33 @@ public class ErrorMonitoring {
         }
     }
 
+    // Обновленный метод handleSilenceTimeout для более детального логирования
     private static void handleSilenceTimeout() {
-        String msg = "Первопричинность: В лог не писалось более " +
-                TimeUnit.MILLISECONDS.toMinutes(LOG_TIMEOUT_MS) + " минут!";
-        if (NOTIFY_ON_FAIL)
-            Notifier.notifyMessageFailure(msg);
+        String detailedMsg = String.format(
+                "🔇 SILENCE TIMEOUT TRIGGERED:\n" +
+                        "📁 Current log: %s\n" +
+                        "📏 File size: %d bytes\n" +
+                        "🕐 Last log time: %s (%s ago)\n" +
+                        "🔄 Tailer running: %s\n" +
+                        "📊 Lines processed: %d\n" +
+                        "⏱ Timeout threshold: %d minutes",
+                (currentLog != null ? currentLog.getName() : "null"),
+                (currentLog != null ? currentLog.length() : 0),
+                new Date(lastLogTime),
+                formatDuration(System.currentTimeMillis() - lastLogTime),
+                isTailerRunning,
+                logLinesCount.get(),
+                TimeUnit.MILLISECONDS.toMinutes(LOG_TIMEOUT_MS)
+        );
 
-        boolean offered = errorQueue.offer(ErrorSeverity.FATAL);
+        System.out.println(detailedMsg);
+
+        if (NOTIFY_ON_FAIL) {
+            Notifier.notifyMessageFailure(detailedMsg);
+        }
+
+        //Error_change_needed
+        boolean offered = errorQueue.offer(ErrorSeverity.RECOVERABLE);
         if (!offered && NOTIFY_ON_FAIL) {
             Notifier.notifyMessageFailure("⚠ Очередь ошибок переполнена (SILENCE TIMEOUT)");
         }

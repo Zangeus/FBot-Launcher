@@ -10,7 +10,8 @@ public class ErrorRules {
     static {
         ERROR_RULES.put("EmulatorNotRunningError", ErrorSeverity.RECOVERABLE);
         ERROR_RULES.put("GameStuckError: Wait too long", ErrorSeverity.RECOVERABLE);
-        ERROR_RULES.put("Request human takeover", ErrorSeverity.FATAL);
+        //Error_change_needed
+        ERROR_RULES.put("Request human takeover", ErrorSeverity.RECOVERABLE);
         ERROR_RULES.put("Task `Rogue` failed 3 or more times.", ErrorSeverity.ROGUE_FAILED_3_TIMES);
     }
 

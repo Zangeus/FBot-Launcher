@@ -38,7 +38,15 @@ public class Main {
             return;
         }
 
+        System.out.println("socksProxyHost=" + System.getProperty("socksProxyHost"));
+        System.out.println("socksProxyPort=" + System.getProperty("socksProxyPort"));
+        System.out.println("useSystemProxies=" + System.getProperty("java.net.useSystemProxies"));
+
         registerBot();
+
+        if (botHandler == null) {
+            System.out.println("Работаем без Telegram");
+        }
         hook();
 
         boolean isSURun = config.isSU_Monitoring();
@@ -390,18 +398,27 @@ public class Main {
         System.out.println("---------------------------------------------");
     }
 
-    private static void registerBot() throws TelegramApiException {
+    private static void registerBot() {
         System.out.println("🤖 Регистрация Telegram бота...");
 
-        TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
-        botHandler = new TelegramBotHandler(
-                ConfigManager.loadConfig().getBotToken(),
-                ConfigManager.loadConfig().getChatId()
-        );
+        try {
+            TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
 
-        org.telegram.telegrambots.meta.generics.BotSession botSession = botsApi.registerBot(botHandler);
-        botHandler.setBotSession(botSession);
+            botHandler = new TelegramBotHandler(
+                    ConfigManager.loadConfig().getBotToken(),
+                    ConfigManager.loadConfig().getChatId()
+            );
 
-        System.out.println("✅ Telegram бот зарегистрирован");
+            var botSession = botsApi.registerBot(botHandler);
+            botHandler.setBotSession(botSession);
+
+            System.out.println("✅ Telegram бот зарегистрирован");
+
+        } catch (TelegramApiException e) {
+            System.err.println("❌ Не удалось зарегистрировать бота:");
+            e.printStackTrace();
+
+            botHandler = null;
+        }
     }
 }
